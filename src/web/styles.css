@@ -326,7 +326,7 @@ dialog::backdrop { overflow: hidden; overscroll-behavior: contain; background: v
 .dialog-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .dialog-head h1 { font-family: var(--display); font-weight: 400; font-size: var(--fs-dialog); overflow-wrap: anywhere; }
 dialog.wide { width: min(36rem, calc(100% - 32px)); }
-.dialog-sub { font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); margin: 8px 0 4px; }
+.dialog-sub { font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); margin: 28px 0 4px; }
 .dialog-sub:first-child { margin-top: 0; }
 dialog { opacity: 0; transition-property: opacity, transform, display, overlay; transition-duration: 0.22s; transition-timing-function: var(--ease-out); transition-behavior: allow-discrete; }
 dialog[open] { opacity: 1; }
@@ -393,13 +393,18 @@ dialog[open] { opacity: 1; }
 .share-strip .row-actions { flex-wrap: wrap; }
 .boards { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 700px) { .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1000px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .board-col { --paper: var(--paper-sun); display: grid; gap: 12px; min-width: 0; }
 /* 面板頂端是一張該組色紙染過的標題紙，帶同一條波浪滾邊 */
 .board-strip {
   position: relative; display: grid; gap: 4px; padding: 26px 16px 12px;
   border-radius: 4px 4px var(--r) var(--r); box-shadow: var(--shadow);
-  background: color-mix(in srgb, var(--paper) 14%, var(--card));
+  background: color-mix(in oklch, var(--paper) 16%, var(--card));
+}
+@media (prefers-color-scheme: dark) {
+  /* 深色：暗下來的黃色、紅色一定變成土黃、磚褐，混到哪裡都一樣；
+     所以標題紙用卡片色，色紙只留在滾邊與一條粗一點的底色帶，色相保持鮮明 */
+  .board-strip { background: var(--card); box-shadow: var(--shadow), inset 0 -4px 0 var(--paper); }
 }
 .board-strip::before {
   content: ""; position: absolute; inset: 0 0 auto 0; height: 14px; border-radius: 4px 4px 0 0; background: var(--paper);
@@ -423,24 +428,43 @@ dialog[open] { opacity: 1; }
 .notes li:nth-child(2n + 1) .note { rotate: -0.4deg; }
 .notes li:nth-child(3n + 2) .note { rotate: 0.3deg; }
 .note {
-  display: grid; gap: 6px; padding: 12px 14px 10px; min-width: 0;
+  display: grid; gap: 6px; padding: 12px 14px 12px; min-width: 0; grid-template-columns: minmax(0, 1fr) auto;
   background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
 }
-.note-kind { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: var(--fs-tag); font-weight: 700; color: var(--muted); }
-.note-kind > span:first-child { display: inline-flex; gap: 6px; align-items: center; }
-.note-kind > span:first-child::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
-.kind-link .note-kind > span:first-child::before { background: var(--paper-sky); }
-.kind-homework .note-kind > span:first-child::before { background: var(--paper-red); }
-.due { justify-self: start; padding: 0 8px; font-size: var(--fs-tag); font-weight: 700; border-radius: var(--r-tag); border: 2px dashed var(--paper-red); color: color-mix(in srgb, var(--paper-red) 55%, var(--ink)); font-variant-numeric: tabular-nums; }
-.note .note-title { margin: 0; font-family: var(--text); font-size: 1.08rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.note > * { grid-column: 1 / -1; }
+/* 老師的編輯與排序按鈕在右上角，和第一行同列 */
+.note.has-actions > :first-child { grid-column: 1; grid-row: 1; align-self: center; }
+.note-actions { grid-column: 2 !important; grid-row: 1; display: flex; margin: -8px -10px -6px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .note.fresh { animation: note-pin 0.55s var(--ease-out) both; }
+}
+@keyframes note-pin {
+  0% { transform: translateY(-18px) rotate(-2deg); opacity: 0; box-shadow: var(--shadow-lift); }
+  60% { transform: translateY(2px); opacity: 1; }
+  100% { transform: none; box-shadow: var(--shadow); }
+}
+.due {
+  justify-self: start; padding: 0 8px; border-radius: var(--r-tag); border: 2px dashed var(--paper-red);
+  font-size: var(--fs-tag); font-weight: 700; color: color-mix(in srgb, var(--paper-red) 55%, var(--ink)); font-variant-numeric: tabular-nums;
+}
+.note .note-title { margin: 0; font-family: var(--text); font-size: 1.12rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .note-body { white-space: pre-wrap; overflow-wrap: anywhere; }
-.note-link { display: flex; gap: 4px; align-items: center; justify-content: space-between; min-width: 0; }
-.note-link a { min-width: 0; overflow-wrap: anywhere; color: var(--accent); font-weight: 600; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.note-link { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; margin-top: 2px; }
+.note-link .domain { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
 .note-link .icon-btn { flex: none; color: var(--ink); border: 1.5px solid var(--line); }
+.open-link svg { width: 18px; height: 18px; }
 .note-foot { border-top: 1px dashed var(--line); padding-top: 6px; overflow-wrap: anywhere; }
-/* 老師的編輯與排序按鈕放在種類那一列的右邊，不另佔一列 */
-.note-actions { display: flex; gap: 0; margin: -8px -10px -8px auto; }
-.note-kind { min-block-size: 28px; }
+
+/* 空公布欄：兩張範例標題紙，點一下就建好 */
+.board-start { display: grid; gap: 12px; }
+.board-sample {
+  width: 100%; text-align: left; cursor: pointer; border: 0; font: inherit; color: var(--ink);
+  outline: 2px dashed color-mix(in srgb, var(--paper) 60%, var(--line-strong)); outline-offset: -2px;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.board-sample:hover { transform: translateY(-2px) rotate(-0.4deg); box-shadow: var(--shadow-lift); }
+.board-sample:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sample-title { display: inline-flex; gap: 8px; align-items: center; font-family: var(--display); font-size: var(--fs-subhead); }
 
 .segmented, .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .choices { display: grid; }
@@ -475,5 +499,14 @@ code.secret {
 /* ---------- 分享頁 ---------- */
 .public .who { color: var(--felt-muted); font-family: var(--display); font-size: var(--fs-subhead); }
 .public .sheet { border-radius: var(--r); margin-top: 16px; }
+/* 分享頁給一到六年級看：字大、行距寬 */
+.public .note { padding: 14px 16px; gap: 8px; }
+.public .note .note-title { font-size: 1.3rem; }
+.public .note-body { font-size: 1.1rem; line-height: 1.7; }
+.public .due { font-size: 1rem; }
+.public .board-strip h2 { font-size: clamp(1.4rem, 3vw, 1.7rem); }
 .pin-form { display: flex; gap: 8px; justify-content: center; }
-.pin-input { width: 8ch !important; text-align: center; font-size: 1.5rem !important; letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.pin-input { width: 9rem !important; text-align: center; font-family: var(--display); font-size: 1.6rem !important; letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.pin-input[aria-invalid="true"] { border-color: var(--danger) !important; background: var(--danger-soft) !important; }
+.login-site { font-family: var(--display); font-size: var(--fs-subhead); color: var(--muted); }
+.login-msg.error { color: var(--danger); font-weight: 600; }

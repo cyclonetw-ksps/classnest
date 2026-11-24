@@ -20,6 +20,7 @@ export function BoardPanel({ state, act }: { state: ClassState; act: Act }) {
   const [confirmBoard, setConfirmBoard] = useState(false);
   const [confirmCard, setConfirmCard] = useState(false);
   const [shareOpen, setShareOpen] = useState<"" | "qr" | "settings">("");
+  const [freshCard, setFreshCard] = useState("");
 
   const colorOf = (id: string) => state.groups.findIndex((g) => g.id === id);
   const groupName = (id: string) => state.groups.find((g) => g.id === id)?.name ?? "";
@@ -58,11 +59,18 @@ export function BoardPanel({ state, act }: { state: ClassState; act: Act }) {
       dueDate: cardDraft.kind === "homework" && cardDraft.dueDate ? cardDraft.dueDate : null,
     };
     const name = cardDraft.title.trim() || KIND_LABEL[cardDraft.kind] + "卡";
+    let created = "";
     const ok = await act(
-      () => (cardDraft.id ? request("PATCH", `cards/${cardDraft.id}`, body) : request("POST", "cards", body)),
+      async () => {
+        if (cardDraft.id) return request("PATCH", `cards/${cardDraft.id}`, body);
+        created = (await request<BoardCard>("POST", "cards", body)).id;
+      },
       cardDraft.id ? `已更新「${name}」` : `已貼上「${name}」`,
     );
-    if (ok) setCardDraft(null);
+    if (ok) {
+      setCardDraft(null);
+      if (created) setFreshCard(created);
+    }
   }
 
   async function deleteCard() {
@@ -97,17 +105,23 @@ export function BoardPanel({ state, act }: { state: ClassState; act: Act }) {
         <div class="row-main">
           <strong>分享連結</strong>
           <span class="meta">
-            {sharedCount > 0 ? `${sharedCount} 個面板分享中` : "還沒有分享的面板"}｜{state.share.hasPin ? "有通關碼" : "沒有通關碼"}
+            {sharedCount > 0
+              ? `${sharedCount} 個面板分享中｜${state.share.hasPin ? "有通關碼" : "沒有通關碼"}`
+              : "把面板設成「分享」後，才有內容可以給代課老師和學生看"}
           </span>
         </div>
         <div class="row-actions">
-          <CopyButton text={shareUrl(state.share)} label="複製分享連結">
-            複製連結
-          </CopyButton>
-          <button class="btn small" onClick={() => setShareOpen("qr")}>
-            <QrIcon />
-            QR Code
-          </button>
+          {sharedCount > 0 && (
+            <>
+              <CopyButton text={shareUrl(state.share)} label="複製分享連結">
+                複製連結
+              </CopyButton>
+              <button class="btn small" onClick={() => setShareOpen("qr")}>
+                <QrIcon />
+                QR Code
+              </button>
+            </>
+          )}
           <button class="btn small" onClick={() => setShareOpen("settings")}>
             分享設定
           </button>
@@ -115,11 +129,28 @@ export function BoardPanel({ state, act }: { state: ClassState; act: Act }) {
       </div>
 
       {boards.length === 0 ? (
-        <div class="empty board-empty">
-          <p>
-            公布欄還是空的。先新增一個面板，例如「本週進度」或「回家作業」，再把文字、連結、作業貼上去。
-          </p>
-          <p class="meta">設成「分享」的面板，代課老師和學生打開分享連結就看得到。</p>
+        <div class="board-start">
+          <p class="hint">公布欄還是空的。點一張範例面板就建好，之後可以改名；也可以按「新增面板」自己取名。</p>
+          <ol class="boards">
+            {[
+              { title: "本週進度", note: "全班・分享：讓代課老師知道這週上到哪裡" },
+              { title: "回家作業", note: "全班・分享：作業連結可以放大成 QR Code" },
+            ].map((t, i) => (
+              <li key={t.title} class="board-col" style={{ "--paper": i === 0 ? "var(--paper-sun)" : "var(--paper-red)" }}>
+                <button
+                  type="button"
+                  class="board-strip board-sample"
+                  onClick={() => act(() => request("POST", "boards", { title: t.title, shared: true }), `已新增面板「${t.title}」`)}
+                >
+                  <span class="sample-title">
+                    <Plus />
+                    {t.title}
+                  </span>
+                  <span class="board-meta">{t.note}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
         </div>
       ) : (
         <ol class="boards">
@@ -160,6 +191,7 @@ export function BoardPanel({ state, act }: { state: ClassState; act: Act }) {
                       <li key={c.id}>
                         <Note
                           card={c}
+                          fresh={c.id === freshCard}
                           footer={c.createdBy.startsWith("agent：") ? `由 ${byWhom(c)} 貼上` : undefined}
                           actions={
                             <>
@@ -460,12 +492,14 @@ function ShareSettingsDialog({ open, state, act, onClose }: { open: boolean; sta
           <button class="btn primary" type="submit">
             {state.share.hasPin ? "換通關碼" : "設定通關碼"}
           </button>
-          {state.share.hasPin && (
-            <button type="button" class="btn" onClick={() => act(() => request("PUT", "share", { pin: null }), "已取消通關碼")}>
+        </form>
+        {state.share.hasPin && (
+          <div class="form-actions start">
+            <button type="button" class="btn quiet" onClick={() => act(() => request("PUT", "share", { pin: null }), "已取消通關碼")}>
               取消通關碼
             </button>
-          )}
-        </form>
+          </div>
+        )}
 
         <h4 class="dialog-sub">換一個新連結</h4>
         <p class="hint">連結外流時用。舊連結會立刻打不開，已經發出去的連結和 QR Code 要重新給。</p>

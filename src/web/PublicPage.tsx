@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { PublicView } from "../shared/types";
-import { ApiError, request } from "./api";
+import { ApiError, getConfig, request } from "./api";
 import { boardPaper, Note } from "./notes";
 import { paperAt } from "./palette";
 
@@ -13,6 +13,13 @@ export function PublicPage({ code }: { code: string }) {
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [group, setGroup] = useState(() => decodeURIComponent(location.hash.slice(1)));
+  // 通關碼畫面也要看得出是哪個班：網站標題本來就公開
+  const [siteTitle, setSiteTitle] = useState("");
+  useEffect(() => {
+    getConfig()
+      .then((c) => setSiteTitle(c.title))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(
     async (p: string, g: string) => {
@@ -24,7 +31,7 @@ export function PublicPage({ code }: { code: string }) {
         return true;
       } catch (err) {
         if (err instanceof ApiError && (err.status === 401 || err.status === 429)) {
-          setPinError(p ? err.message : "");
+          setPinError(p || err.status === 429 ? (err.status === 429 ? err.message : `${err.message}，請再試一次；連錯太多次要等幾分鐘。`) : "");
           setPhase("pin");
         } else if (err instanceof ApiError && err.status === 404) setPhase("gone");
         else setPhase("error");
@@ -60,6 +67,7 @@ export function PublicPage({ code }: { code: string }) {
   if (phase === "gone")
     return (
       <main class="login">
+        {siteTitle && <p class="login-site">{siteTitle}</p>}
         <h1>連結已失效</h1>
         <p class="muted">這個分享連結已經換新或打錯了，請向老師索取新的連結。</p>
       </main>
@@ -76,6 +84,7 @@ export function PublicPage({ code }: { code: string }) {
   if (phase === "pin")
     return (
       <main class="login">
+        {siteTitle && <p class="login-site">{siteTitle}</p>}
         <h1>輸入通關碼</h1>
         <p class="muted">老師給的 4 位數字</p>
         <form
@@ -106,7 +115,7 @@ export function PublicPage({ code }: { code: string }) {
             打開
           </button>
         </form>
-        <p class="login-msg" id="pub-pin-err" role="status">
+        <p class={`login-msg${pinError ? " error" : ""}`} id="pub-pin-err" role="status">
           {pinError}
         </p>
       </main>
