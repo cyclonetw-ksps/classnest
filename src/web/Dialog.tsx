@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useId, useRef } from "preact/hooks";
+import { Close } from "./icons";
 
 // 原生 <dialog>（Modern Web Guidance：dialog、light-dismiss-a-dialog）。
 // 開關由 open 控制；按 Esc、點外面或關閉按鈕都會呼叫 onClose。
@@ -48,8 +49,8 @@ export function Dialog(props: { open: boolean; title: string; onClose: () => voi
     <dialog ref={ref} {...({ closedby: "any" } as object)} aria-labelledby={titleId}>
       <div class="dialog-head">
         <h1 id={titleId}>{props.title}</h1>
-        <button type="button" class="btn ghost" onClick={() => ref.current?.close()}>
-          關閉
+        <button type="button" class="icon-btn" aria-label="關閉" onClick={() => ref.current?.close()}>
+          <Close />
         </button>
       </div>
       {props.open && props.children}

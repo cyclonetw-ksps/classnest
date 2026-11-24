@@ -122,7 +122,7 @@ export function App() {
           </button>
         )}
       </p>
-      <main class="panel">
+      <main class="sheet">
         {tab === "points" && <PointsPanel state={state} act={act} />}
         {tab === "students" && <StudentsPanel state={state} act={act} />}
         {tab === "groups" && <GroupsPanel state={state} act={act} />}

@@ -53,7 +53,8 @@ export function Login(props: { title: string; clientId: string; onLoggedIn: () =
             }
           },
         });
-        window.google.accounts.id.renderButton(button.current, { theme: "outline", size: "large", text: "signin_with", locale: "zh-TW" });
+        const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+        window.google.accounts.id.renderButton(button.current, { theme: dark ? "filled_black" : "outline", size: "large", text: "signin_with", locale: "zh-TW" });
       })
       .catch(() => setMessage("載入 Google 登入失敗，請檢查網路後重新整理。"));
     return () => {
