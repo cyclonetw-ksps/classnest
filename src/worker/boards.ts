@@ -215,7 +215,7 @@ export class BoardStore {
       kind,
       card.title,
       card.body,
-      card.url,
+      kind === "text" ? "" : card.url,
       kind === "homework" ? (f.dueDate ?? null) : null,
       position + 1,
       actor,
@@ -244,7 +244,7 @@ export class BoardStore {
         kind,
         merged.title,
         merged.body,
-        merged.url,
+        kind === "text" ? "" : merged.url,
         due,
         Date.now(),
         id,
@@ -345,12 +345,17 @@ export class BoardStore {
     if (!code || code !== this.setting("share_code")) return reply(404, { error: "這個分享連結已失效，請向老師索取新的連結" });
     const hash = this.setting("share_pin_hash");
     if (hash) {
-      const now = Date.now();
-      const lockedUntil = Number(this.setting("pin_locked_until") ?? 0);
-      if (now < lockedUntil) return reply(429, { error: "通關碼錯太多次，請過幾分鐘再試", needPin: true });
+      const locked = () => Date.now() < Number(this.setting("pin_locked_until") ?? 0);
+      const lockedReply = () => reply(429, { error: "通關碼錯太多次，請過幾分鐘再試", needPin: true });
+      if (locked()) return lockedReply();
       const pin = typeof body.pin === "string" ? body.pin : "";
       if (!pin) return reply(401, { error: "請輸入通關碼", needPin: true });
-      if ((await sha256Hex(`${this.setting("share_pin_salt")}:${pin}`)) !== hash) {
+      const digest = await sha256Hex(`${this.setting("share_pin_salt")}:${pin}`);
+      // await 之後重新讀鎖定與雜湊：同時送進來的猜測不能都趁 await 之前的檢查過關。
+      // 從這裡到寫入計數都是同步的，不會被別的請求插隊
+      if (locked()) return lockedReply();
+      const now = Date.now();
+      if (digest !== this.setting("share_pin_hash")) {
         const fails = Number(this.setting("pin_fails") ?? 0) + 1;
         if (fails >= LIMITS.pinAttempts) {
           this.putSetting("pin_fails", null);

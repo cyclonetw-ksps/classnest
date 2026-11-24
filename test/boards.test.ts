@@ -88,6 +88,16 @@ describe("公布欄卡片", () => {
     expect((await api(c, "POST", "/api/cards", { boardId: "nope", kind: "text", title: "x" })).status).toBe(404);
   });
 
+  it("文字卡不保留網址", async () => {
+    const c = await login(FIRST_TEACHER);
+    const b = await newBoard(c, "文字卡網址");
+    const k = await newCard(c, b.id, { kind: "text", title: "提醒", url: "https://example.com/" });
+    expect(k.url).toBe("");
+    const l = await newCard(c, b.id, { kind: "link", title: "連結", url: "https://example.com/" });
+    const changed = await ok(api<BoardCard>(c, "PATCH", `/api/cards/${l.id}`, { kind: "text" }));
+    expect(changed.url).toBe("");
+  });
+
   it("文字卡至少要有標題或內文", async () => {
     const c = await login(FIRST_TEACHER);
     const b = await newBoard(c, "空卡檢查");

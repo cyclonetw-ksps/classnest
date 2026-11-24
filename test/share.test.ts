@@ -10,6 +10,8 @@ async function view(code: string, body: Record<string, unknown> = {}) {
 
 async function setup() {
   const c = await login(FIRST_TEACHER);
+  // 同一個檔案的測試共用一個班級；先清掉前面建的面板，避免超過面板上限
+  for (const b of (await state(c)).boards) await ok(api(c, "DELETE", `/api/boards/${b.id}`));
   await ok(api(c, "PUT", "/api/share", { pin: null }));
   const g1 = await ok(api<Group>(c, "POST", "/api/groups", { name: "分享甲組" }));
   const g2 = await ok(api<Group>(c, "POST", "/api/groups", { name: "分享乙組" }));
@@ -85,6 +87,15 @@ describe("分享頁", () => {
     expect((await view(share.code, { pin: "8642" })).status).toBe(429);
     await ok(api(c, "PUT", "/api/share", { pin: "8642" }));
     expect((await view(share.code, { pin: "8642" })).status).toBe(200);
+    await ok(api(c, "PUT", "/api/share", { pin: null }));
+  });
+
+  it("同時送出大量錯誤通關碼，也會在 10 次後鎖住", async () => {
+    const { c, share } = await setup();
+    await ok(api(c, "PUT", "/api/share", { pin: "1357" }));
+    const results = await Promise.all(Array.from({ length: 30 }, () => view(share.code, { pin: "0000" })));
+    expect(results.filter((r) => r.status === 401).length).toBeLessThanOrEqual(10);
+    expect((await view(share.code, { pin: "1357" })).status).toBe(429);
     await ok(api(c, "PUT", "/api/share", { pin: null }));
   });
 

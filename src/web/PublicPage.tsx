@@ -12,7 +12,13 @@ export function PublicPage({ code }: { code: string }) {
   const [view, setView] = useState<PublicView | null>(null);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
-  const [group, setGroup] = useState(() => decodeURIComponent(location.hash.slice(1)));
+  const [group, setGroup] = useState(() => {
+    try {
+      return decodeURIComponent(location.hash.slice(1));
+    } catch {
+      return "";
+    }
+  });
   // 通關碼畫面也要看得出是哪個班：網站標題本來就公開
   const [siteTitle, setSiteTitle] = useState("");
   useEffect(() => {
