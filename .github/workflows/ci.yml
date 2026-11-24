@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event_name == 'push' && 'deploy-main' || format('ci-{0}', github.ref) }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # pnpm test 會先 vite build，dist/ 直接拿去部署
+      - run: pnpm test
+      # 只有合併進 main 才部署。部署專屬的值放在 repo 的 variables／secrets，不寫進程式。
+      - name: Deploy to Cloudflare
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: >-
+          pnpm exec wrangler deploy
+          --var "GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }}"
+          --var "FIRST_TEACHER_EMAIL:${{ secrets.FIRST_TEACHER_EMAIL }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"

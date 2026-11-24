@@ -1,0 +1,24 @@
+{
+  "name": "classnest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test": "vite build && tsc --noEmit && vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite build && wrangler dev"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.9",
+    "@cloudflare/vitest-plugin": "1.4.7",
+    "@cloudflare/workers-types": "^5.20261026.1",
+    "@preact/preset-vite": "2.10.6",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "4.1.12",
+    "wrangler": "4.148.0"
+  }
+}
