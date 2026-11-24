@@ -1,6 +1,7 @@
 import type { PublicConfig } from "../shared/types";
 import type { Env } from "./env";
 import { verifyGoogleIdToken } from "./google";
+import { handleMcp } from "./mcp";
 export { ClassroomDO } from "./classroom";
 
 const COOKIE = "cn_session";
@@ -50,9 +51,18 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
 
 async function handleApi(request: Request, env: Env, path: string[]): Promise<Response> {
   if (crossSite(request)) return error(403, "不接受來自其他網站的請求");
+  const room = classroom(env);
+
+  // agent 入口：只認 agent 金鑰，不認老師的登入 cookie
+  if (path.length === 1 && path[0] === "mcp") {
+    return handleMcp(request, {
+      auth: async (key) => (await room.agentAuth(key)) !== null,
+      tool: (key, name, args) => room.agentTool(key, name, args),
+    });
+  }
+
   const body = await readBody(request);
   if (body === null) return error(400, "請求格式不正確");
-  const room = classroom(env);
   const route = `${request.method} ${path.join("/")}`;
 
   if (route === "GET config") {
@@ -69,6 +79,16 @@ async function handleApi(request: Request, env: Env, path: string[]): Promise<Re
   if (route === "POST auth/logout") {
     await room.logout(sessionToken(request));
     return json({ ok: true }, 200, { "set-cookie": sessionCookie("", 0) });
+  }
+
+  // 分享頁：只憑分享代碼（與可選通關碼），只回分享的面板
+  if (path[0] === "public") {
+    if (request.method !== "POST" || path.length !== 2) return error(404, "找不到這個功能");
+    const result = await room.publicView(path[1], body);
+    return new Response(result.json, {
+      status: result.status,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+    });
   }
 
   // 登入相關只有上面兩個入口，沒有其他（例如開發用的免驗證登入）

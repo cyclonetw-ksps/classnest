@@ -78,3 +78,21 @@ export async function ok<T>(p: Promise<{ status: number; body: T }>): Promise<T>
   if (r.status !== 200) throw new Error(`expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
   return r.body;
 }
+
+// 用 agent 金鑰呼叫 MCP 入口（JSON-RPC 2.0）
+export async function mcp(key: string | null, method: string, params: Record<string, unknown> = {}, id: number | undefined = 1) {
+  const headers: Record<string, string> = { accept: "application/json, text/event-stream" };
+  if (key !== null) headers.authorization = `Bearer ${key}`;
+  const res = await call("/api/mcp", { method: "POST", headers, json: { jsonrpc: "2.0", id, method, params } });
+  const text = await res.text();
+  return { status: res.status, body: (text ? JSON.parse(text) : null) as { result?: any; error?: { code: number; message: string } } | null };
+}
+
+// 呼叫一個 MCP 工具；回傳解析後的內容或錯誤文字
+export async function tool(key: string, name: string, args: Record<string, unknown> = {}) {
+  const r = await mcp(key, "tools/call", { name, arguments: args });
+  if (r.status !== 200 || !r.body?.result) throw new Error(`tool ${name} failed ${r.status}: ${JSON.stringify(r.body)}`);
+  const text = r.body.result.content?.[0]?.text ?? "";
+  if (r.body.result.isError) return { isError: true as const, text, value: null };
+  return { isError: false as const, text, value: JSON.parse(text) };
+}

@@ -9,7 +9,8 @@
     "dev": "vite build && wrangler dev"
   },
   "dependencies": {
-    "preact": "10.29.8"
+    "preact": "10.29.8",
+    "qrcode-generator": "2.0.4"
   },
   "devDependencies": {
     "@babel/core": "^8.0.9",

@@ -90,7 +90,7 @@ body {
 input, textarea { caret-color: var(--accent); }
 h1, h2, h3 { margin: 0; line-height: 1.3; text-wrap: balance; letter-spacing: -0.01em; }
 p { margin: 0; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--r-tag); }
 html { scrollbar-color: var(--line-strong) var(--felt); }
 .meta { font-variant-numeric: tabular-nums; }
@@ -151,7 +151,7 @@ html { scrollbar-color: var(--line-strong) var(--felt); }
   display: inline-flex; gap: 6px; align-items: center; justify-content: center;
   min-block-size: 44px; padding: 8px 18px; border-radius: 12px;
   border: 1.5px solid var(--line-strong); background: var(--card); color: var(--ink);
-  font-weight: 600; cursor: pointer;
+  font-weight: 600; cursor: pointer; text-decoration: none;
   transition: background-color 0.15s var(--ease-out), transform 0.15s var(--ease-out);
 }
 .btn:hover { background: color-mix(in srgb, var(--card) 85%, var(--ink)); }
@@ -162,6 +162,10 @@ html { scrollbar-color: var(--line-strong) var(--felt); }
 .btn.quiet { background: transparent; border-color: var(--line); color: var(--muted); }
 .btn.quiet:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
 .btn.small { min-block-size: 40px; padding: 6px 12px; font-size: var(--fs-small); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--sheet); }
+.btn.danger:hover { background: color-mix(in srgb, var(--danger) 88%, black); }
+.btn svg { flex: none; }
+.icon-btn:disabled { opacity: 0.35; cursor: default; background: transparent; }
 .icon-btn { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .icon-btn:hover { background: var(--line); color: var(--ink); }
 
@@ -289,19 +293,23 @@ section { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .form { display: grid; gap: 4px; }
 .field { display: grid; gap: 6px; margin: 0 0 14px; border: 0; padding: 0; min-width: 0; }
 .field label, .field legend { font-weight: 700; padding: 0; }
-input:not([type="checkbox"]), select {
+input:not([type="checkbox"], [type="radio"]), select, textarea {
   min-block-size: 46px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--line-strong);
   background: var(--sheet); width: 100%; min-width: 0;
 }
-input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
-input::placeholder { color: var(--muted); }
-input:user-invalid { border-color: var(--danger); background: var(--danger-soft); }
+textarea { resize: vertical; min-block-size: 5.5rem; line-height: 1.6; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+input:user-invalid, textarea:user-invalid { border-color: var(--danger); background: var(--danger-soft); }
 .error-msg { display: none; color: var(--danger); font-size: 0.9rem; font-weight: 600; }
 input:user-invalid ~ .error-msg { display: block; }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .check { display: inline-flex; gap: 8px; align-items: center; min-block-size: 44px; font-weight: 500 !important; }
 .check input { width: 22px; height: 22px; accent-color: var(--accent); }
-.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.swatch-dot { flex: none; width: 10px; height: 10px; border-radius: var(--r-tiny); background: var(--paper); }
+.form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.form-actions.spread { justify-content: space-between; }
+.form-actions.start { justify-content: flex-start; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .inline-form input { flex: 1 1 12rem; width: auto; }
 .inline-form input.num { flex: 0 0 6.5rem; }
@@ -316,7 +324,10 @@ dialog {
 dialog:modal { overscroll-behavior: contain; }
 dialog::backdrop { overflow: hidden; overscroll-behavior: contain; background: var(--scrim); }
 .dialog-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.dialog-head h1 { font-family: var(--display); font-weight: 400; font-size: var(--fs-dialog); }
+.dialog-head h1 { font-family: var(--display); font-weight: 400; font-size: var(--fs-dialog); overflow-wrap: anywhere; }
+dialog.wide { width: min(36rem, calc(100% - 32px)); }
+.dialog-sub { font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); margin: 28px 0 4px; }
+.dialog-sub:first-child { margin-top: 0; }
 dialog { opacity: 0; transition-property: opacity, transform, display, overlay; transition-duration: 0.22s; transition-timing-function: var(--ease-out); transition-behavior: allow-discrete; }
 dialog[open] { opacity: 1; }
 @starting-style { dialog[open] { opacity: 0; } }
@@ -328,7 +339,7 @@ dialog[open] { opacity: 1; }
 
 /* ---------- 登入：一張釘在絨布上的紙 ---------- */
 .login {
-  max-width: 26rem; margin: 14vh auto 0; padding: 36px 28px 28px; display: grid; gap: 16px; justify-items: center; text-align: center;
+  width: min(26rem, calc(100% - 32px)); margin: 14vh auto 0; padding: 36px 28px 28px; display: grid; gap: 16px; justify-items: center; text-align: center;
   background: var(--sheet); border-radius: 4px 4px var(--r) var(--r); box-shadow: var(--shadow-lift); position: relative;
 }
 .login::before {
@@ -373,3 +384,135 @@ dialog[open] { opacity: 1; }
 .step.done .step-no { color: var(--muted); }
 .step.done .step-title { text-decoration: line-through 1.5px; color: var(--muted); }
 .step.done .step-state { color: color-mix(in srgb, var(--paper-grass) 55%, var(--ink)); }
+
+/* ---------- 公布欄：每個面板是一欄便條 ---------- */
+.share-strip {
+  display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-radius: var(--r); border: 1.5px dashed var(--line-strong);
+}
+.share-strip .row-actions { flex-wrap: wrap; }
+.boards { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 700px) { .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.board-col { --paper: var(--paper-sun); display: grid; gap: 12px; min-width: 0; }
+/* 面板頂端是一張該組色紙染過的標題紙，帶同一條波浪滾邊 */
+.board-strip {
+  position: relative; display: grid; gap: 4px; padding: 26px 16px 12px;
+  border-radius: 4px 4px var(--r) var(--r); box-shadow: var(--shadow);
+  background: color-mix(in oklch, var(--paper) 16%, var(--card));
+}
+@media (prefers-color-scheme: dark) {
+  /* 深色：暗下來的黃色、紅色一定變成土黃、磚褐，混到哪裡都一樣；
+     所以標題紙用卡片色，色紙只留在滾邊與一條粗一點的底色帶，色相保持鮮明 */
+  .board-strip { background: var(--card); box-shadow: var(--shadow), inset 0 -4px 0 var(--paper); }
+}
+.board-strip::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 14px; border-radius: 4px 4px 0 0; background: var(--paper);
+  mask: radial-gradient(circle at 8px 14px, transparent 6.5px, var(--mask-ink) 7px) 0 0 / 16px 14px repeat-x;
+}
+.board-strip h2, .board-strip h3 { font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); margin: 0; overflow-wrap: anywhere; }
+.board-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: var(--fs-small); color: var(--muted); }
+.board-scope { display: inline-flex; gap: 4px; align-items: center; font-weight: 700; }
+.board-scope svg { width: 16px; height: 16px; }
+.board-scope.shared { color: color-mix(in srgb, var(--paper-grass) 60%, var(--ink)); }
+.board-groups { overflow-wrap: anywhere; }
+.board-actions { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-top: 6px; }
+.board-actions .btn { margin-right: auto; }
+.board-blank { padding: 18px 12px; text-align: center; color: var(--muted); font-size: var(--fs-small); border: 1.5px dashed var(--line-strong); border-radius: var(--r); }
+.board-empty { display: grid; gap: 6px; justify-items: center; }
+.board-empty p { max-width: 40ch; }
+
+.notes { list-style: none; margin: 0; padding: 0 4px; display: grid; gap: 14px; }
+.notes li { min-width: 0; container-type: inline-size; }
+/* 便條釘上去不會完全正 */
+.notes li:nth-child(2n + 1) .note { rotate: -0.4deg; }
+.notes li:nth-child(3n + 2) .note { rotate: 0.3deg; }
+.note {
+  display: grid; gap: 6px; padding: 12px 14px 12px; min-width: 0; grid-template-columns: minmax(0, 1fr) auto;
+  background: var(--card); border-radius: 4px; box-shadow: var(--shadow);
+}
+.note > * { grid-column: 1 / -1; }
+/* 老師的編輯與排序按鈕在右上角，和第一行同列 */
+.note.has-actions > :first-child { grid-column: 1; grid-row: 1; align-self: center; }
+.note-actions { grid-column: 2 !important; grid-row: 1; display: flex; margin: -8px -10px -6px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .note.fresh { animation: note-pin 0.55s var(--ease-out) both; }
+}
+@keyframes note-pin {
+  0% { transform: translateY(-18px) rotate(-2deg); opacity: 0; box-shadow: var(--shadow-lift); }
+  60% { transform: translateY(2px); opacity: 1; }
+  100% { transform: none; box-shadow: var(--shadow); }
+}
+.due {
+  justify-self: start; padding: 0 8px; border-radius: var(--r-tag); border: 2px dashed var(--paper-red);
+  font-size: var(--fs-tag); font-weight: 700; color: color-mix(in srgb, var(--paper-red) 55%, var(--ink)); font-variant-numeric: tabular-nums;
+}
+.note .note-title { margin: 0; font-family: var(--text); font-size: 1.12rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.note-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-link { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; margin-top: 2px; }
+.note-link .domain { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+.note-link .icon-btn { flex: none; color: var(--ink); border: 1.5px solid var(--line); }
+.open-link svg { width: 18px; height: 18px; }
+.note-foot { border-top: 1px dashed var(--line); padding-top: 6px; overflow-wrap: anywhere; }
+
+/* 面板窄（iPad 橫向三欄）時，按鈕移到便條最底下一列靠右，標題不被擠斷行、也不和內文拆開 */
+@container (max-width: 300px) {
+  .note.has-actions > :first-child { grid-column: 1 / -1; }
+  .note-actions { grid-column: 1 / -1 !important; grid-row: auto; order: 99; justify-content: flex-end; margin: -4px -10px -8px 0; }
+}
+
+/* 空公布欄：兩張範例標題紙，點一下就建好 */
+.board-start { display: grid; gap: 12px; }
+.board-sample {
+  width: 100%; text-align: left; cursor: pointer; border: 0; font: inherit; color: var(--ink);
+  outline: 2px dashed color-mix(in srgb, var(--paper) 60%, var(--line-strong)); outline-offset: -2px;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.board-sample:hover { transform: translateY(-2px) rotate(-0.4deg); box-shadow: var(--shadow-lift); }
+.board-sample:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sample-title { display: inline-flex; gap: 8px; align-items: center; font-family: var(--display); font-size: var(--fs-subhead); }
+
+.segmented, .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choices { display: grid; }
+.segmented label, .choice {
+  display: inline-flex; gap: 10px; align-items: center; min-block-size: 44px; padding: 6px 16px; cursor: pointer;
+  border: 1.5px solid var(--line-strong); border-radius: 12px; background: var(--card); font-weight: 600;
+}
+.segmented label { flex: 1 1 0; justify-content: center; padding-inline: 10px; }
+.choice { align-items: start; padding-block: 10px; }
+.choice > span { display: grid; gap: 0; }
+.segmented input, .choice input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); flex: none; }
+.choice input { margin-top: 3px; }
+.segmented label:has(:checked), .choice:has(:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.segmented label:has(:focus-visible), .choice:has(:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.copy { display: inline-flex; gap: 8px; align-items: center; }
+.copy-tip { font-size: var(--fs-small); font-weight: 600; color: var(--muted); }
+.qr-view { display: grid; gap: 12px; justify-items: center; }
+.qr-view .field { justify-self: stretch; margin: 0; }
+.qr { width: min(100%, 22rem); height: auto; border-radius: var(--r-tag); box-shadow: var(--shadow); }
+.qr-url { font-size: var(--fs-small); color: var(--muted); overflow-wrap: anywhere; text-align: center; max-width: 100%; }
+.qr-view .form-actions { justify-content: center; }
+
+.key-view .field { gap: 8px; justify-items: start; }
+.field-label { font-weight: 700; }
+.key-warn { padding: 10px 14px; border-radius: 12px; border: 2px dashed var(--paper-sun); font-weight: 600; }
+code.secret {
+  display: block; justify-self: stretch; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line-strong);
+  background: var(--sheet); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9rem; overflow-wrap: anywhere; user-select: all;
+}
+
+/* ---------- 分享頁 ---------- */
+.public .who { color: var(--felt-muted); font-family: var(--display); font-size: var(--fs-subhead); }
+.public .sheet { border-radius: var(--r); margin-top: 16px; }
+/* 分享頁給一到六年級看：字大、行距寬 */
+.public .note { padding: 14px 16px; gap: 8px; }
+.public .note .note-title { font-size: 1.3rem; }
+.public .note-body { font-size: 1.1rem; line-height: 1.7; }
+.public .due { font-size: 1rem; }
+.public .board-strip h2 { font-size: clamp(1.4rem, 3vw, 1.7rem); }
+.pin-form { display: flex; gap: 8px; justify-content: center; }
+.pin-input { width: 9rem !important; text-align: center; font-family: var(--display); font-size: 1.6rem !important; letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.pin-input[aria-invalid="true"] { border-color: var(--danger) !important; background: var(--danger-soft) !important; }
+.login-site { font-family: var(--display); font-size: var(--fs-subhead); color: var(--muted); }
+.login-msg.error { color: var(--danger); font-weight: 600; }

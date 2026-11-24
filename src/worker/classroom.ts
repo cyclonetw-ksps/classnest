@@ -10,6 +10,8 @@ import {
   type Teacher,
 } from "../shared/types";
 import type { Env } from "./env";
+import { BoardStore, type AgentIdentity } from "./boards";
+import { bool, fail, idList, InputError, int, newId, newSessionToken, ok, sha256Hex, text, type Body, type Result } from "./validate";
 
 // 一套部署只有一個班級，全部資料放在這一個 Durable Object 的 SQLite 裡。
 // 所有權限與內容檢查都在這裡做；Worker 只負責驗證 Google 身分與路由。
@@ -23,73 +25,22 @@ export interface Me {
   name: string;
 }
 
-export type Result<T = unknown> = { ok: true; value: T } | { ok: false; status: number; error: string };
-
-const ok = <T>(value: T): Result<T> => ({ ok: true, value });
-const fail = (status: number, error: string): Result<never> => ({ ok: false, status, error });
-
-class InputError extends Error {}
-
-type Body = Record<string, unknown>;
-
-function text(body: Body, key: string, max: number, opts: { required?: boolean; label: string }): string | undefined {
-  const v = body[key];
-  if (v === undefined || v === null) {
-    if (opts.required) throw new InputError(`請填寫${opts.label}`);
-    return undefined;
+// 執行一個操作，把結果或輸入錯誤轉成 { status, json }
+async function reply(run: () => Result | Promise<Result>): Promise<{ status: number; json: string }> {
+  let result: Result;
+  try {
+    result = await run();
+  } catch (err) {
+    if (!(err instanceof InputError)) throw err;
+    result = fail(400, err.message);
   }
-  if (typeof v !== "string") throw new InputError(`${opts.label}格式不正確`);
-  const t = v.trim();
-  if (opts.required && !t) throw new InputError(`請填寫${opts.label}`);
-  if (t.length > max) throw new InputError(`${opts.label}最多 ${max} 個字`);
-  return t;
-}
-
-function int(body: Body, key: string, min: number, max: number, opts: { required?: boolean; label: string }): number | undefined {
-  const v = body[key];
-  if (v === undefined || v === null) {
-    if (opts.required) throw new InputError(`請填寫${opts.label}`);
-    return undefined;
-  }
-  if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) {
-    throw new InputError(`${opts.label}要是 ${min} 到 ${max} 的整數`);
-  }
-  return v;
-}
-
-function bool(body: Body, key: string): boolean | undefined {
-  const v = body[key];
-  if (v === undefined) return undefined;
-  if (typeof v !== "boolean") throw new InputError("格式不正確");
-  return v;
-}
-
-function idList(body: Body, key: string, max: number): string[] | undefined {
-  const v = body[key];
-  if (v === undefined) return undefined;
-  if (!Array.isArray(v) || v.length > max || v.some((x) => typeof x !== "string")) throw new InputError("名單格式不正確");
-  return [...new Set(v as string[])];
-}
-
-function newId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 12);
-}
-
-async function sha256Hex(s: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function newSessionToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const data = result.ok ? result.value : { error: result.error };
+  return { status: result.ok ? 200 : result.status, json: JSON.stringify(data) };
 }
 
 export class ClassroomDO extends DurableObject<Env> {
   private sql: SqlStorage;
+  private board: BoardStore;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -120,6 +71,7 @@ export class ClassroomDO extends DurableObject<Env> {
         reward_id TEXT NOT NULL, student_id TEXT NOT NULL, granted_at INTEGER NOT NULL, granted_by TEXT NOT NULL,
         PRIMARY KEY (reward_id, student_id));
     `);
+    this.board = new BoardStore(this.sql, ctx.storage);
   }
 
   /* ---------- 登入與工作階段 ---------- */
@@ -171,19 +123,30 @@ export class ClassroomDO extends DurableObject<Env> {
   /* ---------- 老師端 API ---------- */
 
   // 回傳 HTTP 狀態與 JSON 字串；錯誤一律是 { error: 說明 }
-  api(me: Me, method: string, path: string[], body: Body): { status: number; json: string } {
-    let result: Result;
-    try {
-      result = this.route(me, method, path, body ?? {});
-    } catch (err) {
-      if (!(err instanceof InputError)) throw err;
-      result = fail(400, err.message);
-    }
-    const data = result.ok ? result.value : { error: result.error };
-    return { status: result.ok ? 200 : result.status, json: JSON.stringify(data) };
+  async api(me: Me, method: string, path: string[], body: Body): Promise<{ status: number; json: string }> {
+    return reply(() => this.route(me, method, path, body ?? {}));
   }
 
-  private route(me: Me, method: string, path: string[], body: Body): Result {
+  /* ---------- 分享頁（不需登入，只有代碼與可選通關碼） ---------- */
+
+  async publicView(code: string, body: Body): Promise<{ status: number; json: string }> {
+    return this.board.publicView(code, body ?? {});
+  }
+
+  /* ---------- agent 入口（MCP；用金鑰，不用老師登入） ---------- */
+
+  async agentAuth(key: string): Promise<AgentIdentity | null> {
+    return this.board.agentAuth(key);
+  }
+
+  // 每次呼叫都重新驗金鑰，停用的金鑰立即失效
+  async agentTool(key: string, name: string, args: Body): Promise<{ status: number; json: string }> {
+    const agent = await this.board.agentAuth(key);
+    if (!agent) return { status: 401, json: JSON.stringify({ error: "金鑰無效或已停用" }) };
+    return reply(() => this.board.agentTool(agent, name, args ?? {}));
+  }
+
+  private route(me: Me, method: string, path: string[], body: Body): Result | Promise<Result> {
     const [resource, id, action] = path;
     const key = `${method} ${resource}${id !== undefined ? "/:id" : ""}${action ? `/${action}` : ""}`;
     switch (key) {
@@ -219,6 +182,26 @@ export class ClassroomDO extends DurableObject<Env> {
         return this.grant(me, id, body, true);
       case "POST rewards/:id/ungrant":
         return this.grant(me, id, body, false);
+      case "POST boards":
+        return this.board.createBoard(body);
+      case "PATCH boards/:id":
+        return this.board.updateBoard(id, body);
+      case "DELETE boards/:id":
+        return this.board.deleteBoard(id);
+      case "POST cards":
+        return this.board.createCard(me.email, body);
+      case "PATCH cards/:id":
+        return this.board.updateCard(id, body);
+      case "DELETE cards/:id":
+        return this.board.deleteCard(id);
+      case "PUT share":
+        return this.board.setPin(body);
+      case "POST share/:id":
+        return id === "reset" ? this.board.resetShare() : fail(404, "找不到這個功能");
+      case "POST agent-keys":
+        return this.board.createKey(me.email, body);
+      case "PATCH agent-keys/:id":
+        return this.board.updateKey(id, body);
       default:
         return fail(404, "找不到這個功能");
     }
@@ -598,6 +581,9 @@ export class ClassroomDO extends DurableObject<Env> {
       rewards: this.rewards(),
       students: this.students(),
       events: this.events("", []),
+      boards: this.board.boards(),
+      share: this.board.share(),
+      agentKeys: this.board.agentKeys(),
     };
   }
 }
