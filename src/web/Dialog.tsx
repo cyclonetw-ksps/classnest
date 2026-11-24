@@ -4,7 +4,7 @@ import { Close } from "./icons";
 
 // 原生 <dialog>（Modern Web Guidance：dialog、light-dismiss-a-dialog）。
 // 開關由 open 控制；按 Esc、點外面或關閉按鈕都會呼叫 onClose。
-export function Dialog(props: { open: boolean; title: string; onClose: () => void; children: ComponentChildren }) {
+export function Dialog(props: { open: boolean; title: string; onClose: () => void; children: ComponentChildren; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -46,7 +46,7 @@ export function Dialog(props: { open: boolean; title: string; onClose: () => voi
   }, [props.onClose]);
 
   return (
-    <dialog ref={ref} {...({ closedby: "any" } as object)} aria-labelledby={titleId}>
+    <dialog ref={ref} class={props.wide ? "wide" : undefined} {...({ closedby: "any" } as object)} aria-labelledby={titleId}>
       <div class="dialog-head">
         <h1 id={titleId}>{props.title}</h1>
         <button type="button" class="icon-btn" aria-label="關閉" onClick={() => ref.current?.close()}>

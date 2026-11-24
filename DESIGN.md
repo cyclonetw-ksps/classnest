@@ -75,6 +75,11 @@ typography:
     fontSize: "0.9rem"
     fontWeight: 600
     lineHeight: 1.4
+  code:
+    fontFamily: "ui-monospace, SF Mono, Menlo, monospace"
+    fontSize: "0.9rem"
+    fontWeight: 400
+    lineHeight: 1.6
 rounded:
   pin: "50%"
   tiny: "3px"
@@ -122,6 +127,16 @@ components:
     backgroundColor: "{colors.felt-deep}"
     textColor: "{colors.felt-muted}"
     height: "46px"
+  board-strip:
+    backgroundColor: "color-mix(paper 14%, card)"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.card-top}"
+    padding: "26px 16px 12px"
+  note:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    rounded: "4px"
+    padding: "12px 14px 10px"
 ---
 
 # Design System: classnest
@@ -171,6 +186,7 @@ components:
 - **Title**（700，1.12rem）：學生名、清單主文字。
 - **Body**（400，17px，1.6）：說明與表單；說明段落最寬 65ch。
 - **Label**（600，0.9rem）：時間、老師名、緞帶文字；數字一律等寬。
+- **Code**（等寬，0.9rem）：只用在 agent 金鑰、MCP 網址與設定指令這類要原樣複製的字串，不拿來裝飾。
 
 **粉圓只說大事規則。** 粉圓只用在標題與分數，內文、按鈕、表單一律系統黑體。
 
@@ -213,6 +229,19 @@ components:
 
 ### Setup Steps（空布告欄）
 組別、加分理由、學生任一項還沒建立時，加分頁顯示三張釘上去的步驟卡（番茄紅、天空藍、向日葵黃滾邊，粉圓大編號），每張是前往該分頁的連結。完成的步驟改成虛線框加刪除線與「已完成」勾；三步都完成後不再出現。編號代表真的先後順序。
+
+### Bulletin Board（公布欄：面板與便條）
+每個面板是一欄：頂端一張標題紙（該面板第一個組別的色紙染 14% 到白卡上，帶同一條波浪滾邊；全班面板用向日葵黃），下面直接釘一張張便條，不再用外框把整欄包起來（卡片裡不放卡片）。標題紙寫面板名稱（粉圓）、「分享中」（分享圖示＋草綠字）或「私人」（鎖頭圖示），以及組別或「全班」。欄數：手機 1 欄、700px 起 2 欄、1000px 起 3 欄。
+- **便條：** 白卡、4px 小圓角、紙陰影，奇數張 -0.4°、部分 0.3° 的手釘斜度。第一列是種類（文字灰點、連結天空藍點、作業番茄紅點，旁邊一定有文字）與老師的編輯、上下移按鈕；接著標題（黑體粗）、繳交日期（番茄紅虛線框，作業才有）、內容（保留換行）、網址（只顯示網域與路徑開頭）與放大 QR Code 的按鈕。agent 貼的便條最下面一行灰字「由 agent：名稱 貼上」。
+- **QR Code：** 對話框加寬到 36rem，白底黑格、四格白邊、最寬 22rem，下面是完整網址、「複製網址」與「打開連結」，投影時全班掃得到。
+- **分享列：** 分享連結是一條虛線框的工具列（不是釘上去的紙），放「複製連結」「QR Code」「分享設定」。
+- **刪除與換新連結：** 在同一個對話框裡先換成確認文字與紅色「確定刪除／確定換新連結」，不跳第二層視窗。
+
+### Share Page（分享頁 /s/代碼）
+給代課老師、學生、家長看，不登入。外框一樣是絨布與標題，紙面上方是組別色紙標籤（「全部」＋有分享面板的組），下面是唯讀的面板與便條（沒有建立者、沒有編輯鈕）。要通關碼時顯示一張和登入頁同款的紙，中間一個大字等寬的 4 位數輸入框。
+
+### Agent Keys（設定頁）
+金鑰清單沿用老師清單樣式。產生後的對話框只出現一次金鑰：黃色虛線框寫明「只會出現這一次」，金鑰、MCP 網址與 Claude Code 一行設定各自一個等寬字串框加複製按鈕。
 
 ### Pin（招牌動作）
 加分成功時，新圖釘從上方落下、略過頭再停住（0.55 秒，exponential ease-out）；減少動態效果時直接出現。撤銷後那枚圖釘消失。

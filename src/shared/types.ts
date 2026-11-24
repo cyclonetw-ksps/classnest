@@ -123,7 +123,8 @@ export interface PublicBoard {
 }
 export interface PublicView {
   title: string;
-  groups: { id: string; name: string }[];
+  // color 是這個組在全部組別裡的順序，用來取同一張色紙（和老師端一致）
+  groups: { id: string; name: string; color: number }[];
   boards: PublicBoard[];
 }
 

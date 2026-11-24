@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { ClassState } from "../shared/types";
 import { ApiError, getConfig, getState, logout } from "./api";
+import { BoardPanel } from "./BoardPanel";
 import { Login } from "./Login";
 import { PointsPanel } from "./PointsPanel";
 import { ReasonsPanel, RewardsPanel } from "./RewardsPanel";
@@ -11,6 +12,7 @@ export type Act = (fn: () => Promise<unknown>, done?: string) => Promise<boolean
 
 const TABS = [
   { id: "points", label: "加分" },
+  { id: "board", label: "公布欄" },
   { id: "students", label: "學生" },
   { id: "groups", label: "組別" },
   { id: "reasons", label: "加分理由" },
@@ -124,6 +126,7 @@ export function App() {
       </p>
       <main class="sheet">
         {tab === "points" && <PointsPanel state={state} act={act} />}
+        {tab === "board" && <BoardPanel state={state} act={act} />}
         {tab === "students" && <StudentsPanel state={state} act={act} />}
         {tab === "groups" && <GroupsPanel state={state} act={act} />}
         {tab === "reasons" && <ReasonsPanel state={state} act={act} />}

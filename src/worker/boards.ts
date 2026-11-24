@@ -373,9 +373,15 @@ export class BoardStore {
         groupIds: b.groupIds,
         cards: b.cards.map(({ createdBy: _hidden, ...card }) => card),
       }));
+    const order = this.sql
+      .exec<{ id: string }>("SELECT id FROM class_groups ORDER BY created_at, rowid")
+      .toArray()
+      .map((g) => g.id);
     const view: PublicView = {
       title: this.setting("title") ?? "",
-      groups: this.activeGroups().filter((g) => used.has(g.id)),
+      groups: this.activeGroups()
+        .filter((g) => used.has(g.id))
+        .map((g) => ({ ...g, color: order.indexOf(g.id) })),
       boards,
     };
     return reply(200, view);

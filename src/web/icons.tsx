@@ -25,3 +25,60 @@ export const Close = () => (
     <path d="M5 5l10 10M15 5L5 15" />
   </svg>
 );
+
+export const ArrowUp = () => (
+  <svg {...base}>
+    <path d="M10 16V4M5 9l5-5 5 5" />
+  </svg>
+);
+
+export const ArrowDown = () => (
+  <svg {...base}>
+    <path d="M10 4v12M5 11l5 5 5-5" />
+  </svg>
+);
+
+export const Pencil = () => (
+  <svg {...base}>
+    <path d="M13.5 3.5l3 3L7 16H4v-3z" />
+  </svg>
+);
+
+export const Copy = () => (
+  <svg {...base}>
+    <rect x="7" y="7" width="10" height="10" rx="2" />
+    <path d="M13 4H5a2 2 0 00-2 2v7" />
+  </svg>
+);
+
+export const QrIcon = () => (
+  <svg {...base}>
+    <rect x="3" y="3" width="5" height="5" rx="1" />
+    <rect x="12" y="3" width="5" height="5" rx="1" />
+    <rect x="3" y="12" width="5" height="5" rx="1" />
+    <path d="M12 12h2v2M17 12v5h-5M14 17v-1" />
+  </svg>
+);
+
+export const LinkIcon = () => (
+  <svg {...base}>
+    <path d="M8.5 11.5a3.5 3.5 0 005 0l2.5-2.5a3.5 3.5 0 00-5-5L10 5" />
+    <path d="M11.5 8.5a3.5 3.5 0 00-5 0L4 11a3.5 3.5 0 005 5l1-1" />
+  </svg>
+);
+
+export const Lock = () => (
+  <svg {...base}>
+    <rect x="4" y="9" width="12" height="8" rx="2" />
+    <path d="M7 9V6.5a3 3 0 016 0V9" />
+  </svg>
+);
+
+export const Share = () => (
+  <svg {...base}>
+    <circle cx="5" cy="10" r="2" />
+    <circle cx="15" cy="5" r="2" />
+    <circle cx="15" cy="15" r="2" />
+    <path d="M7 9l6-3M7 11l6 3" />
+  </svg>
+);
