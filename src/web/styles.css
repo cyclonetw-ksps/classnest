@@ -339,7 +339,7 @@ dialog[open] { opacity: 1; }
 
 /* ---------- 登入：一張釘在絨布上的紙 ---------- */
 .login {
-  max-width: 26rem; margin: 14vh auto 0; padding: 36px 28px 28px; display: grid; gap: 16px; justify-items: center; text-align: center;
+  width: min(26rem, calc(100% - 32px)); margin: 14vh auto 0; padding: 36px 28px 28px; display: grid; gap: 16px; justify-items: center; text-align: center;
   background: var(--sheet); border-radius: 4px 4px var(--r) var(--r); box-shadow: var(--shadow-lift); position: relative;
 }
 .login::before {
@@ -393,7 +393,7 @@ dialog[open] { opacity: 1; }
 .share-strip .row-actions { flex-wrap: wrap; }
 .boards { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 700px) { .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1200px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .boards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .board-col { --paper: var(--paper-sun); display: grid; gap: 12px; min-width: 0; }
 /* 面板頂端是一張該組色紙染過的標題紙，帶同一條波浪滾邊 */
 .board-strip {
@@ -423,7 +423,7 @@ dialog[open] { opacity: 1; }
 .board-empty p { max-width: 40ch; }
 
 .notes { list-style: none; margin: 0; padding: 0 4px; display: grid; gap: 14px; }
-.notes li { min-width: 0; }
+.notes li { min-width: 0; container-type: inline-size; }
 /* 便條釘上去不會完全正 */
 .notes li:nth-child(2n + 1) .note { rotate: -0.4deg; }
 .notes li:nth-child(3n + 2) .note { rotate: 0.3deg; }
@@ -454,6 +454,12 @@ dialog[open] { opacity: 1; }
 .note-link .icon-btn { flex: none; color: var(--ink); border: 1.5px solid var(--line); }
 .open-link svg { width: 18px; height: 18px; }
 .note-foot { border-top: 1px dashed var(--line); padding-top: 6px; overflow-wrap: anywhere; }
+
+/* 面板窄（iPad 橫向三欄）時，按鈕移到標題下一列，標題不被擠斷行 */
+@container (max-width: 300px) {
+  .note.has-actions > :first-child { grid-column: 1 / -1; }
+  .note-actions { grid-column: 1 / -1 !important; grid-row: 2; justify-content: flex-end; margin: -6px -10px -4px 0; }
+}
 
 /* 空公布欄：兩張範例標題紙，點一下就建好 */
 .board-start { display: grid; gap: 12px; }
