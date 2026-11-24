@@ -3,7 +3,7 @@ import type { ClassState, PointEvent, Student } from "../shared/types";
 import { request } from "./api";
 import type { Act } from "./App";
 import { Dialog } from "./Dialog";
-import { Undo } from "./icons";
+import { Check, Undo } from "./icons";
 import { paperAt } from "./palette";
 
 type Target = { kind: "student"; student: Student } | { kind: "group"; groupId: string; name: string; count: number };
@@ -33,6 +33,7 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
   const ordered = groupId ? [...active.filter(inGroup), ...active.filter((s) => !inGroup(s))] : active;
   const members = active.filter(inGroup);
   const group = groups.find((g) => g.id === groupId);
+  const setupDone = groups.length > 0 && reasons.length > 0 && active.length > 0;
 
   const hueOf = (s: Student) => {
     const gid = groupId && s.groupIds.includes(groupId) ? groupId : s.groupIds.find((id) => groups.some((g) => g.id === id));
@@ -60,7 +61,7 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
         加分
       </h2>
       <div class="board-head">
-        {groups.length > 0 && (
+        {groups.length > 0 && active.length > 0 && (
           <div class="labels" role="group" aria-label="篩選組別">
             <button class="label" aria-pressed={groupId === ""} onClick={() => setGroupId("")}>
               全部
@@ -82,11 +83,13 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
         )}
       </div>
 
-      {reasons.length === 0 && <p class="hint">還沒有加分理由。先到「加分理由」新增，例如「寫完作業 +2」。</p>}
+      {!setupDone && <SetupSteps groups={groups.length > 0} reasons={reasons.length > 0} students={active.length > 0} />}
 
-      {active.length === 0 ? (
-        <p class="empty">{state.students.length === 0 ? "布告欄還是空的。先到「學生」新增名單。" : "目前沒有啟用中的學生。"}</p>
-      ) : (
+      {state.students.length > 0 && active.length === 0 && (
+        <p class="empty">名單裡的學生都停用了。到「學生」按「啟用」，或新增學生。</p>
+      )}
+
+      {active.length > 0 && (
         <ul class="cards">
           {ordered.map((s) => {
             const pending = pendingRewards(s);
@@ -112,7 +115,14 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
                     <small>分</small>
                   </span>
                   <span class="ribbon-slot">
-                    {pending.length > 0 && <span class="ribbon">可領：{pending[0]}{pending.length > 1 ? ` 等 ${pending.length} 項` : ""}</span>}
+                    {pending.length > 0 && (
+                      <span class="ribbon">
+                        <span class="ribbon-text" title={`可領：${pending.join("、")}`}>
+                          可領：{pending[0]}
+                          {pending.length > 1 ? ` 等 ${pending.length} 項` : ""}
+                        </span>
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -173,6 +183,44 @@ function RecentEvents({ events, act }: { events: PointEvent[]; act: Act }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+// 空的布告欄：三張釘上去的步驟卡，按下去直接到那一頁；三步都完成就不再出現
+function SetupSteps(props: { groups: boolean; reasons: boolean; students: boolean }) {
+  const steps = [
+    { done: props.groups, href: "#groups", title: "建立組別", body: "例如「國語五年級組」。同一位學生可以在好幾組。", paper: 0 },
+    { done: props.reasons, href: "#reasons", title: "設定加分理由", body: "例如「寫完作業 +2」「主動幫忙 +3」，上課按一下就加分。", paper: 1 },
+    { done: props.students, href: "#students", title: "加入學生", body: "只要顯示名、原班、導師稱呼，再勾選所屬組別。", paper: 2 },
+  ];
+  const left = steps.filter((s) => !s.done).length;
+  return (
+    <section class="setup" aria-labelledby="setup-title">
+      <h2 id="setup-title">先把布告欄布置好</h2>
+      <p class="hint">還差 {left} 步。完成後，這裡會變成每位學生的紙卡，按一下就能加分。</p>
+      <ol class="steps">
+        {steps.map((s, i) => (
+          <li key={s.href}>
+            <a class={`step ${s.done ? "done" : ""}`} href={s.href} style={{ "--paper": paperAt(s.paper).hue }}>
+              <i class="pin" style={{ "--pin": paperAt(s.paper).hue }} aria-hidden="true" />
+              <span class="step-no" aria-hidden="true">{i + 1}</span>
+              <span class="step-title">{s.title}</span>
+              <span class="step-body">{s.body}</span>
+              <span class="step-state">
+                {s.done ? (
+                  <>
+                    <Check />
+                    已完成
+                  </>
+                ) : (
+                  "前往設定"
+                )}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

@@ -123,7 +123,9 @@ export function RewardsPanel({ state, act }: { state: ClassState; act: Act }) {
                           <strong>{s.displayName}</strong>
                           <span class={`ribbon ${grantedAt ? "granted" : ""}`}>
                             {grantedAt && <Check />}
-                            {s.total} 分・{grantedAt ? "已發放" : "可以發放"}
+                            <span class="ribbon-text">
+                              {s.total} 分・{grantedAt ? "已發放" : "可以發放"}
+                            </span>
                           </span>
                         </div>
                         <button
