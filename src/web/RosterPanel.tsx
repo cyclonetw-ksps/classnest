@@ -3,6 +3,7 @@ import { LIMITS, type ClassState, type Group, type Student } from "../shared/typ
 import { request } from "./api";
 import type { Act } from "./App";
 import { Dialog } from "./Dialog";
+import { paperAt } from "./palette";
 
 type Draft = { id?: string; displayName: string; homeClass: string; homeroomTeacher: string; groupIds: string[] };
 const empty: Draft = { displayName: "", homeClass: "", homeroomTeacher: "", groupIds: [] };
@@ -153,8 +154,9 @@ export function GroupsPanel({ state, act }: { state: ClassState; act: Act }) {
         </button>
       </form>
       <ul class="rows">
-        {state.groups.map((g) => (
+        {state.groups.map((g, i) => (
           <li key={g.id} class={g.active ? "" : "inactive"}>
+            <span class="swatch" style={{ "--paper": paperAt(i).hue }} title={paperAt(i).name} aria-hidden="true" />
             <div class="row-main">
               <strong>{g.name}</strong>
               <span class="meta">

@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { LIMITS, type ClassState } from "../shared/types";
 import { request } from "./api";
 import type { Act } from "./App";
+import { Check } from "./icons";
 
 export function ReasonsPanel({ state, act }: { state: ClassState; act: Act }) {
   const [label, setLabel] = useState("");
@@ -120,7 +121,8 @@ export function RewardsPanel({ state, act }: { state: ClassState; act: Act }) {
                       <li key={s.id}>
                         <div class="row-main">
                           <strong>{s.displayName}</strong>
-                          <span class="meta">
+                          <span class={`ribbon ${grantedAt ? "granted" : ""}`}>
+                            {grantedAt && <Check />}
                             {s.total} 分・{grantedAt ? "已發放" : "可以發放"}
                           </span>
                         </div>

@@ -3,6 +3,8 @@ import type { ClassState, PointEvent, Student } from "../shared/types";
 import { request } from "./api";
 import type { Act } from "./App";
 import { Dialog } from "./Dialog";
+import { Undo } from "./icons";
+import { paperAt } from "./palette";
 
 type Target = { kind: "student"; student: Student } | { kind: "group"; groupId: string; name: string; count: number };
 
@@ -13,11 +15,30 @@ function timeOf(ms: number) {
 export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
   const [groupId, setGroupId] = useState<string>("");
   const [target, setTarget] = useState<Target | null>(null);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
   const groups = state.groups.filter((g) => g.active);
   const reasons = state.reasons.filter((r) => r.active);
-  const pendingRewards = (s: Student) => s.rewards.filter((r) => r.unlocked && r.grantedAt === null).length;
-  const students = state.students.filter((s) => s.active && (!groupId || s.groupIds.includes(groupId)));
+  const groupIndex = (id: string) => state.groups.findIndex((g) => g.id === id);
+  // 理由改名或刪除後，舊圖釘用中性色，不冒充第一個理由的顏色
+  const pinColor = (label: string) => {
+    const i = state.reasons.findIndex((r) => r.label === label);
+    return i < 0 ? "var(--line-strong)" : paperAt(i).hue;
+  };
+  const pendingRewards = (s: Student) =>
+    s.rewards.filter((r) => r.unlocked && r.grantedAt === null).map((r) => state.rewards.find((w) => w.id === r.rewardId)?.title ?? "");
+
+  const active = state.students.filter((s) => s.active);
+  // 選了某組：這組排前面，其他組的卡變淡但留在原地，老師知道還有誰
+  const inGroup = (s: Student) => !groupId || s.groupIds.includes(groupId);
+  const ordered = groupId ? [...active.filter(inGroup), ...active.filter((s) => !inGroup(s))] : active;
+  const members = active.filter(inGroup);
   const group = groups.find((g) => g.id === groupId);
+
+  const hueOf = (s: Student) => {
+    const gid = groupId && s.groupIds.includes(groupId) ? groupId : s.groupIds.find((id) => groups.some((g) => g.id === id));
+    return gid ? paperAt(groupIndex(gid)).hue : "var(--line-strong)";
+  };
+  const pinsOf = (s: Student) => state.events.filter((e) => e.studentId === s.id && !e.undoneAt).slice(0, 3);
 
   async function award(reasonId: string) {
     if (!target) return;
@@ -25,54 +46,78 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
     const body = target.kind === "student" ? { reasonId, studentIds: [target.student.id] } : { reasonId, groupId: target.groupId };
     const who = target.kind === "student" ? target.student.displayName : `${target.name}（${target.count} 人）`;
     setTarget(null);
-    await act(() => request("POST", "points", body), `已替 ${who} 加 ${reason.points} 分：${reason.label}`);
+    let created: string[] = [];
+    const ok = await act(async () => {
+      const res = await request<{ events: PointEvent[] }>("POST", "points", body);
+      created = res.events.map((e) => e.id);
+    }, `已替 ${who} 加 ${reason.points} 分：${reason.label}`);
+    if (ok) setFresh(new Set(created));
   }
 
   return (
-    <section aria-labelledby="points-title">
+    <section aria-labelledby="points-title" class="board">
       <h2 id="points-title" class="visually-hidden">
         加分
       </h2>
-      {groups.length > 0 && (
-        <div class="chips" role="group" aria-label="篩選組別">
-          <button class="chip" aria-pressed={groupId === ""} onClick={() => setGroupId("")}>
-            全部
-          </button>
-          {groups.map((g) => (
-            <button key={g.id} class="chip" aria-pressed={groupId === g.id} onClick={() => setGroupId(g.id)}>
-              {g.name}
+      <div class="board-head">
+        {groups.length > 0 && (
+          <div class="labels" role="group" aria-label="篩選組別">
+            <button class="label" aria-pressed={groupId === ""} onClick={() => setGroupId("")}>
+              全部
             </button>
-          ))}
-        </div>
-      )}
+            {groups.map((g) => {
+              const p = paperAt(groupIndex(g.id));
+              return (
+                <button key={g.id} class="label" style={{ "--paper": p.hue, "--on-paper": p.ink }} aria-pressed={groupId === g.id} onClick={() => setGroupId(g.id)}>
+                  {g.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {group && members.length > 0 && reasons.length > 0 && (
+          <button class="btn primary" onClick={() => setTarget({ kind: "group", groupId: group.id, name: group.name, count: members.length })}>
+            替整組加分（{members.length} 人）
+          </button>
+        )}
+      </div>
 
       {reasons.length === 0 && <p class="hint">還沒有加分理由。先到「加分理由」新增，例如「寫完作業 +2」。</p>}
 
-      {group && students.length > 0 && reasons.length > 0 && (
-        <button class="btn primary wide" onClick={() => setTarget({ kind: "group", groupId: group.id, name: group.name, count: students.length })}>
-          替整組加分（{group.name}，{students.length} 人）
-        </button>
-      )}
-
-      {students.length === 0 ? (
-        <p class="hint">{state.students.length === 0 ? "還沒有學生。先到「學生」新增名單。" : "這組目前沒有學生。"}</p>
+      {active.length === 0 ? (
+        <p class="empty">{state.students.length === 0 ? "布告欄還是空的。先到「學生」新增名單。" : "目前沒有啟用中的學生。"}</p>
       ) : (
-        <ul class="student-grid">
-          {students.map((s) => (
-            <li key={s.id}>
-              <button
-                class="student-card"
-                disabled={reasons.length === 0}
-                onClick={() => setTarget({ kind: "student", student: s })}
-                aria-label={`替 ${s.displayName} 加分，目前 ${s.total} 分`}
-              >
-                <span class="name">{s.displayName}</span>
-                <span class="total">{s.total}</span>
-                <span class="unit">分</span>
-                {pendingRewards(s) > 0 && <span class="badge">可領 {pendingRewards(s)} 項獎勵</span>}
-              </button>
-            </li>
-          ))}
+        <ul class="cards">
+          {ordered.map((s) => {
+            const pending = pendingRewards(s);
+            return (
+              <li key={s.id} class={inGroup(s) ? "" : "dim"}>
+                <button
+                  class="student"
+                  style={{ "--paper": hueOf(s) }}
+                  disabled={reasons.length === 0}
+                  onClick={() => setTarget({ kind: "student", student: s })}
+                  aria-label={`替 ${s.displayName} 加分，目前 ${s.total} 分${pending.length ? `，可領 ${pending.join("、")}` : ""}`}
+                >
+                  <span class="student-head">
+                    <span class="name">{s.displayName}</span>
+                    <span class="pins" aria-hidden="true">
+                      {pinsOf(s).map((e) => (
+                        <i key={e.id} class={`pin ${fresh.has(e.id) ? "drop" : ""}`} style={{ "--pin": pinColor(e.reasonLabel) }} />
+                      ))}
+                    </span>
+                  </span>
+                  <span class="total">
+                    {s.total}
+                    <small>分</small>
+                  </span>
+                  <span class="ribbon-slot">
+                    {pending.length > 0 && <span class="ribbon">可領：{pending[0]}{pending.length > 1 ? ` 等 ${pending.length} 項` : ""}</span>}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -84,9 +129,10 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
         <ul class="reason-list">
           {reasons.map((r, i) => (
             <li key={r.id}>
-              <button class="reason-btn" autoFocus={i === 0} onClick={() => award(r.id)}>
+              <button class="reason" autoFocus={i === 0} onClick={() => award(r.id)}>
+                <i class="pin" style={{ "--pin": paperAt(state.reasons.indexOf(r)).hue }} aria-hidden="true" />
+                <span class="label-text">{r.label}</span>
                 <span class="pts">+{r.points}</span>
-                {r.label}
               </button>
             </li>
           ))}
@@ -104,10 +150,10 @@ function RecentEvents({ events, act }: { events: PointEvent[]; act: Act }) {
     <section class="recent" aria-labelledby="recent-title">
       <h2 id="recent-title">最近的加分</h2>
       <ul>
-        {events.map((e) => (
+        {events.slice(0, 12).map((e) => (
           <li key={e.id} class={e.undoneAt ? "undone" : ""}>
             <span class="what">
-              <strong>{e.studentName}</strong> +{e.points} {e.reasonLabel}
+              <strong>{e.studentName}</strong> {e.reasonLabel} <span class="pts">+{e.points}</span>
             </span>
             <span class="meta">
               {timeOf(e.createdAt)}・{e.teacherEmail.split("@")[0]}
@@ -116,10 +162,11 @@ function RecentEvents({ events, act }: { events: PointEvent[]; act: Act }) {
               <span class="meta">已撤銷</span>
             ) : (
               <button
-                class="btn small"
-                aria-label={`撤銷 ${e.studentName} 的 +${e.points} ${e.reasonLabel}`}
+                class="btn quiet small"
+                aria-label={`撤銷 ${e.studentName} 的 ${e.reasonLabel} +${e.points}`}
                 onClick={() => act(() => request("POST", `points/${e.id}/undo`), `已撤銷 ${e.studentName} 的 ${e.points} 分`)}
               >
+                <Undo />
                 撤銷
               </button>
             )}
