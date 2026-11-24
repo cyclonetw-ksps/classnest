@@ -61,6 +61,44 @@ export interface PointEvent {
   undoneBy: string | null;
 }
 
+export type CardKind = "text" | "link" | "homework";
+
+// 公布欄的一張便條。createdBy 是老師信箱，或「agent：金鑰名稱」
+export interface BoardCard {
+  id: string;
+  kind: CardKind;
+  title: string;
+  body: string;
+  url: string;
+  dueDate: string | null;
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// 公布欄的一個面板（一欄便條）。groupIds 空白代表全班
+export interface Board {
+  id: string;
+  title: string;
+  groupIds: string[];
+  shared: boolean;
+  cards: BoardCard[];
+}
+
+export interface ShareInfo {
+  code: string;
+  hasPin: boolean;
+}
+
+export interface AgentKey {
+  id: string;
+  name: string;
+  active: boolean;
+  createdBy: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+
 export interface ClassState {
   me: { email: string; name: string };
   title: string;
@@ -70,6 +108,23 @@ export interface ClassState {
   rewards: Reward[];
   students: Student[];
   events: PointEvent[];
+  boards: Board[];
+  share: ShareInfo;
+  agentKeys: AgentKey[];
+}
+
+// 分享頁看到的內容：只有分享的面板與組別名稱，沒有任何學生資料，也不顯示是誰貼的
+export type PublicCard = Omit<BoardCard, "createdBy">;
+export interface PublicBoard {
+  id: string;
+  title: string;
+  groupIds: string[];
+  cards: PublicCard[];
+}
+export interface PublicView {
+  title: string;
+  groups: { id: string; name: string }[];
+  boards: PublicBoard[];
 }
 
 export const LIMITS = {
@@ -84,4 +139,15 @@ export const LIMITS = {
   rewards: 50,
   teachers: 10,
   recentEvents: 50,
+  boards: 30,
+  boardTitle: 30,
+  cardsPerBoard: 100,
+  cardTitle: 60,
+  cardBody: 1000,
+  url: 2000,
+  agentKeys: 20,
+  keyName: 30,
+  // 通關碼連續答錯幾次後暫停一段時間
+  pinAttempts: 10,
+  pinLockMs: 10 * 60 * 1000,
 } as const;
