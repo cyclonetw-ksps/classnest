@@ -5,13 +5,6 @@ primary_target: "src/web"
 related_targets: []
 ---
 
----
-version: 1
-slug: "src-web"
-primary_target: "src/web"
-related_targets: []
----
-
 # Surface brief：老師後台（加分、學生、組別、加分理由、獎勵、設定）
 
 Scope：src/web 的老師後台，之後的學生頁與大螢幕沿用同一個世界。Mode：Operate。

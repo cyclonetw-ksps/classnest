@@ -85,9 +85,11 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
 
       {!setupDone && <SetupSteps groups={groups.length > 0} reasons={reasons.length > 0} students={active.length > 0} />}
 
-      {setupDone && active.length === 0 ? (
-        <p class="empty">目前沒有啟用中的學生。到「學生」重新啟用或新增。</p>
-      ) : active.length === 0 ? null : (
+      {state.students.length > 0 && active.length === 0 && (
+        <p class="empty">名單裡的學生都停用了。到「學生」按「啟用」，或新增學生。</p>
+      )}
+
+      {active.length > 0 && (
         <ul class="cards">
           {ordered.map((s) => {
             const pending = pendingRewards(s);
@@ -115,7 +117,10 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
                   <span class="ribbon-slot">
                     {pending.length > 0 && (
                       <span class="ribbon">
-                        <span class="ribbon-text">可領：{pending[0]}{pending.length > 1 ? ` 等 ${pending.length} 項` : ""}</span>
+                        <span class="ribbon-text" title={`可領：${pending.join("、")}`}>
+                          可領：{pending[0]}
+                          {pending.length > 1 ? ` 等 ${pending.length} 項` : ""}
+                        </span>
                       </span>
                     )}
                   </span>
