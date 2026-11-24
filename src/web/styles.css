@@ -455,10 +455,10 @@ dialog[open] { opacity: 1; }
 .open-link svg { width: 18px; height: 18px; }
 .note-foot { border-top: 1px dashed var(--line); padding-top: 6px; overflow-wrap: anywhere; }
 
-/* 面板窄（iPad 橫向三欄）時，按鈕移到標題下一列，標題不被擠斷行 */
+/* 面板窄（iPad 橫向三欄）時，按鈕移到便條最底下一列靠右，標題不被擠斷行、也不和內文拆開 */
 @container (max-width: 300px) {
   .note.has-actions > :first-child { grid-column: 1 / -1; }
-  .note-actions { grid-column: 1 / -1 !important; grid-row: 2; justify-content: flex-end; margin: -6px -10px -4px 0; }
+  .note-actions { grid-column: 1 / -1 !important; grid-row: auto; order: 99; justify-content: flex-end; margin: -4px -10px -8px 0; }
 }
 
 /* 空公布欄：兩張範例標題紙，點一下就建好 */
