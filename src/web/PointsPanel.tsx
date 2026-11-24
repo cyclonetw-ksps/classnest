@@ -19,7 +19,11 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
   const groups = state.groups.filter((g) => g.active);
   const reasons = state.reasons.filter((r) => r.active);
   const groupIndex = (id: string) => state.groups.findIndex((g) => g.id === id);
-  const reasonIndex = (label: string) => Math.max(0, state.reasons.findIndex((r) => r.label === label));
+  // 理由改名或刪除後，舊圖釘用中性色，不冒充第一個理由的顏色
+  const pinColor = (label: string) => {
+    const i = state.reasons.findIndex((r) => r.label === label);
+    return i < 0 ? "var(--line-strong)" : paperAt(i).hue;
+  };
   const pendingRewards = (s: Student) =>
     s.rewards.filter((r) => r.unlocked && r.grantedAt === null).map((r) => state.rewards.find((w) => w.id === r.rewardId)?.title ?? "");
 
@@ -95,11 +99,11 @@ export function PointsPanel({ state, act }: { state: ClassState; act: Act }) {
                   onClick={() => setTarget({ kind: "student", student: s })}
                   aria-label={`替 ${s.displayName} 加分，目前 ${s.total} 分${pending.length ? `，可領 ${pending.join("、")}` : ""}`}
                 >
-                  <span class="top">
+                  <span class="student-head">
                     <span class="name">{s.displayName}</span>
                     <span class="pins" aria-hidden="true">
                       {pinsOf(s).map((e) => (
-                        <i key={e.id} class={`pin ${fresh.has(e.id) ? "drop" : ""}`} style={{ "--pin": paperAt(reasonIndex(e.reasonLabel)).hue }} />
+                        <i key={e.id} class={`pin ${fresh.has(e.id) ? "drop" : ""}`} style={{ "--pin": pinColor(e.reasonLabel) }} />
                       ))}
                     </span>
                   </span>

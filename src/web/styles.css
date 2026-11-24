@@ -128,6 +128,8 @@ html { scrollbar-color: var(--line-strong) var(--felt); }
   transition: background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
 }
 .tab:hover { color: var(--felt-ink); }
+/* 分頁列會自己捲動，外框畫在分頁內側才不會被裁掉 */
+.tab:focus-visible { outline-offset: -3px; }
 .tab[aria-current="page"] { background: var(--sheet); color: var(--ink); font-weight: 700; }
 .sheet {
   background: var(--sheet); border-radius: 0 var(--r) var(--r) var(--r);
@@ -182,8 +184,9 @@ html { scrollbar-color: var(--line-strong) var(--felt); }
 /* 手釘上去的紙卡不會完全正 */
 .cards li:nth-child(3n + 1) .student { rotate: -0.5deg; }
 .cards li:nth-child(3n + 2) .student { rotate: 0.35deg; }
-.cards li.dim { opacity: 0.42; }
-.cards li.dim:hover, .cards li.dim:focus-within { opacity: 0.85; }
+.cards li.dim .student { background: color-mix(in srgb, var(--card) 55%, var(--sheet)); box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -1.5px; }
+.cards li.dim .student::before { opacity: 0.35; }
+.cards li.dim .student .total { color: var(--muted); }
 .student {
   --paper: var(--line-strong);
   position: relative; width: 100%; height: 100%; min-height: 10rem; padding: 26px 16px 14px;
@@ -200,11 +203,11 @@ html { scrollbar-color: var(--line-strong) var(--felt); }
 }
 .student:hover:not(:disabled) { transform: translateY(-2px) rotate(-0.4deg); box-shadow: var(--shadow-lift); }
 .student:disabled { cursor: default; }
-.student .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.student .student-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
 .student .name { font-weight: 700; font-size: 1.12rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 699px) {
   .student { padding-inline: 14px; }
-  .student .top { gap: 6px; }
+  .student .student-head { gap: 6px; }
   .pins { gap: 3px; }
   .pins .pin { width: 12px; height: 12px; }
 }
