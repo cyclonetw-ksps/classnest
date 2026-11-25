@@ -91,6 +91,22 @@ typography:
     fontWeight: 400
     lineHeight: 1.2
     fontFeature: "tnum"
+  stage-label:
+    fontFamily: "Huninn, PingFang TC, Noto Sans TC, sans-serif"
+    fontSize: "clamp(1.25rem, min(4.6cqw, 6cqh), 4.5rem)"
+    fontWeight: 400
+    lineHeight: 1.2
+  stage-time:
+    fontFamily: "Huninn, PingFang TC, Noto Sans TC, sans-serif"
+    fontSize: "min(13cqw, 28cqh)"
+    fontWeight: 400
+    lineHeight: 1
+    fontFeature: "tnum"
+  stage-tag:
+    fontFamily: "PingFang TC, Noto Sans TC, Microsoft JhengHei, system-ui, sans-serif"
+    fontSize: "clamp(1rem, min(2.6cqw, 4cqh), 2rem)"
+    fontWeight: 700
+    lineHeight: 1.4
   code:
     fontFamily: "ui-monospace, SF Mono, Menlo, monospace"
     fontSize: "0.9rem"
@@ -148,6 +164,14 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.card-top}"
     padding: "26px 16px 12px"
+  stage:
+    backgroundColor: "{colors.felt}"
+    textColor: "{colors.card}"
+    rounded: "{rounded.sheet}"
+  dial:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.paper-red}"
+    rounded: "{rounded.pin}"
   note:
     backgroundColor: "{colors.card}"
     textColor: "{colors.ink}"
@@ -204,6 +228,7 @@ components:
 - **Label**（600，0.9rem）：時間、老師名、緞帶文字；數字一律等寬。
 - **Student body／Student tag**（1.1rem 行高 1.7／1rem 粗）：分享頁給學生看的便條內文與作業徽章。
 - **Pin**（粉圓 1.6rem，等寬數字）：分享頁的通關碼輸入。
+- **Stage label／Stage time／Stage tag**（粉圓／粉圓等寬數字／黑體粗）：大螢幕舞台上的計時名稱、剩餘時間與「暫停中」。字級用舞台的容器單位（cqw、cqh）算，舞台多大字就多大，投影 1920 寬時剩餘時間約 250px。
 - **Code**（等寬，0.9rem）：只用在 agent 金鑰、MCP 網址與設定指令這類要原樣複製的字串，不拿來裝飾。
 
 **粉圓只說大事規則。** 粉圓只用在標題與分數，內文、按鈕、表單一律系統黑體。
@@ -225,6 +250,7 @@ components:
 - **抬起** (`box-shadow: 0 4px 8px rgb(23 62 75 / 0.12), 0 18px 36px rgb(23 62 75 / 0.18)`)：懸停中的學生卡、對話框、登入紙。
 - **圖釘** (`box-shadow: 1px 3px 2px rgb(0 0 0 / 0.3), 2px 5px 6px rgb(0 0 0 / 0.12)`)：圖釘的針影；落下動畫起點是 `0 14px 10px rgb(0 0 0 / 0.08)`。
 - **色票** (`box-shadow: 0 1px 2px rgb(0 0 0 / 0.2)`)：組別頁的色紙色票。
+- **舞台凹陷** (`box-shadow: inset 0 2px 10px rgb(0 0 0 / 0.18)`)：大螢幕的絨布舞台，像布告欄上凹下去的一塊；全螢幕時拿掉。
 
 ## Shapes
 
@@ -262,6 +288,14 @@ components:
 
 ### Agent Keys（設定頁）
 金鑰清單沿用老師清單樣式。產生後的對話框只出現一次金鑰：黃色虛線框寫明「只會出現這一次」，金鑰、MCP 網址與 Claude Code 一行設定各自一個等寬字串框加複製按鈕。
+
+### Screen（大螢幕計時）
+給投影看的計時畫面，只有時間，不放任何學生資料或分數。左邊（1000px 起，21rem 寬）或上方是設定：「計時」一張紙（常用分鐘按鈕 1、3、5、10、15、20、30，粉圓大數字，一按就開始；下面是自訂分鐘 1 到 180）與「倒數到時刻」一張紙（名稱可不填，例如「下課」；時刻用原生時間欄位；已經過的時刻在欄位下方紅字說明，不開始）。
+- **舞台：** 一塊絨布（深淺色模式都是絨布，投影對比最穩），上方粉圓寫「計時 10 分鐘」或「下課 10:30」，中間是釘在絨布上的紙鐘面，旁邊或下方是粉圓大字剩餘時間。舞台用 container query 排版：寬比高大 1.15 倍以上時鐘面與數字左右並排，否則上下疊。
+- **鐘面：** 白卡圓面（深淺色模式都是白紙配番茄紅，投影對比固定）、外圈一道紙邊、12 道刻度（SVG 線條，3、6、9、12 點較長）、中心一枚絨布色圖釘。剩餘時間是一塊番茄紅扇形，像時鐘指針一樣往 12 點收（`<progress>` 加 `conic-gradient`，`--value` 用 `@property` 註冊，每 250 毫秒更新一次並平滑過渡；減少動態效果時直接跳）。閒置時扇形是淡灰，不顯示數字。
+- **控制列：** 舞台最下面一列，左邊是計時操作（向日葵黃主按鈕「暫停／繼續」、「重來」、「結束」；倒數到時刻只有「結束」），右邊是工具（「靜音」開關、閒置時的「試聽」、「全螢幕」）。舞台上的次要按鈕是透明底白框白字；靜音按下時改成絨布深處底加實線白框、圖示換成斜線鈴鐺，不比主按鈕搶眼。常用分鐘按鈕排成 4 欄。瀏覽器不支援全螢幕（例如 iPhone）時不顯示該按鈕。
+- **暫停：** 數字改成淡藍灰，下方一個向日葵黃虛線框「暫停中」。
+- **時間到：** 扇形消失、數字換成向日葵黃粉圓大字「時間到」，舞台內側一圈 4px 向日葵黃虛線（不只靠顏色）；字用和圖釘同一條 0.55 秒 ease-out 落下，減少動態效果時直接出現。提示音是現場合成的三個上行音響兩次，靜音記在這台裝置。
 
 ### Pin（招牌動作）
 加分成功時，新圖釘從上方落下、略過頭再停住（0.55 秒，exponential ease-out）；減少動態效果時直接出現。撤銷後那枚圖釘消失。
