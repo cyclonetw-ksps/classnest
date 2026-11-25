@@ -4,12 +4,14 @@ on:
   pull_request:
   push:
     branches: [main]
+  # 自架的人設好 secrets／variables 後，可以在 Actions 分頁按「Run workflow」直接部署
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'push' && 'deploy-main' || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'deploy-main' || format('ci-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
@@ -27,9 +29,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # pnpm test 會先 vite build，dist/ 直接拿去部署
       - run: pnpm test
-      # 只有合併進 main 才部署。部署專屬的值放在 repo 的 variables／secrets，不寫進程式。
+      # 只有 main 才部署（合併進 main，或在 main 上手動執行）。部署專屬的值放在 repo 的 variables／secrets，不寫進程式。
       - name: Deploy to Cloudflare
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: >-
           pnpm exec wrangler deploy
           --var "GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }}"

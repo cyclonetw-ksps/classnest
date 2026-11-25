@@ -1,0 +1,8 @@
+# 本機開發（pnpm dev）用的設定範本。複製成 .dev.vars 再填你自己的值；.dev.vars 不會進 git。
+# 正式部署不用這個檔，值放在 GitHub 的 Settings → Secrets and variables → Actions（見 docs/self-hosting.md）。
+
+# Google 登入的用戶端 ID（網頁應用程式）。本機開發時，「已授權的 JavaScript 來源」要加上 http://localhost 與 http://localhost:8787
+GOOGLE_CLIENT_ID=填你的用戶端ID.apps.googleusercontent.com
+
+# 第一位老師的 Google 信箱：只有這個信箱第一次登入時會自動成為老師，之後由他在「設定」邀請其他老師
+FIRST_TEACHER_EMAIL=you@example.com
