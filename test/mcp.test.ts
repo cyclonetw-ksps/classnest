@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentKey, Board, Group } from "../src/shared/types";
+import type { AgentKey, Board, Group, Period, WeekView } from "../src/shared/types";
 import { api, call, FIRST_TEACHER, login, mcp, ok, state, tool } from "./helpers";
 
 async function newKey(c: string, name: string) {
@@ -39,14 +39,14 @@ describe("MCP 入口", () => {
     expect((await mcp("not-a-real-key", "tools/call", { name: "list_boards" })).status).toBe(401);
   });
 
-  it("initialize 與 tools/list 回 JSON，工具只有組別、面板與卡片", async () => {
+  it("initialize 與 tools/list 回 JSON，工具只有組別、面板、卡片與課表", async () => {
     const c = await login(FIRST_TEACHER);
     const k = await newKey(c, "列工具");
     const init = await mcp(k.key, "initialize", { protocolVersion: "2025-06-18" });
     expect(init.status).toBe(200);
     expect(init.body?.result.protocolVersion).toBe("2025-06-18");
     const names = (await mcp(k.key, "tools/list")).body!.result.tools.map((t: { name: string }) => t.name).sort();
-    expect(names).toEqual(["create_board", "create_card", "delete_board", "delete_card", "list_boards", "list_groups", "update_board", "update_card"]);
+    expect(names).toEqual(["create_board", "create_card", "delete_board", "delete_card", "get_timetable", "get_week", "list_boards", "list_groups", "set_week_plan", "update_board", "update_card"]);
   });
 
   it("agent 可以列出組別（只有名稱，沒有學生）", async () => {
@@ -120,5 +120,72 @@ describe("MCP 入口", () => {
   it("MCP 只收 POST", async () => {
     const res = await call("/api/mcp", { method: "GET" });
     expect([401, 405]).toContain(res.status);
+  });
+});
+
+describe("MCP 課表工具", () => {
+  async function setup() {
+    const c = await login(FIRST_TEACHER);
+    for (const p of (await state(c)).periods) await ok(api(c, "DELETE", `/api/periods/${p.id}`));
+    const g = await ok(api<Group>(c, "POST", "/api/groups", { name: "MCP 課表組" }));
+    const p1 = await ok(api<Period>(c, "POST", "/api/periods", { label: "第一節", start: "08:40", end: "09:20" }));
+    const p2 = await ok(api<Period>(c, "POST", "/api/periods", { label: "第二節", start: "09:30", end: "10:10" }));
+    await ok(api(c, "PUT", "/api/slots", { weekday: 1, periodId: p1.id, groupId: g.id, subject: "國語" }));
+    const k = await newKey(c, "課表助手");
+    return { c, g, p1, p2, k };
+  }
+
+  it("agent 可以讀節次與固定課表、讀某一週", async () => {
+    const { g, p1, k } = await setup();
+    const t = await tool(k.key, "get_timetable");
+    expect(t.isError).toBe(false);
+    expect(t.value.periods.map((p: Period) => p.label)).toEqual(["第一節", "第二節"]);
+    expect(t.value.slots).toEqual(expect.arrayContaining([expect.objectContaining({ weekday: 1, periodId: p1.id, groupId: g.id, subject: "國語" })]));
+    expect(t.value.groups).toEqual(expect.arrayContaining([{ id: g.id, name: "MCP 課表組" }]));
+    const w = await tool(k.key, "get_week", { weekStart: "2026-11-23" });
+    expect((w.value as WeekView).lessons).toHaveLength(10);
+  });
+
+  it("agent 一次寫入整週，記下是哪把金鑰寫的", async () => {
+    const { c, p1, p2, k } = await setup();
+    const r = await tool(k.key, "set_week_plan", {
+      weekStart: "2026-11-23",
+      lessons: [
+        { weekday: 1, periodId: p1.id, content: "第六課", homework: "生字一行" },
+        { weekday: 2, periodId: p2.id, content: "分數加法", bring: "量角器" },
+      ],
+    });
+    expect(r.isError).toBe(false);
+    expect(r.value.saved).toBe(2);
+    const v = await ok(api<WeekView>(c, "GET", "/api/week/2026-11-23"));
+    const l1 = v.lessons.find((l) => l.weekday === 1 && l.periodId === p1.id)!;
+    expect(l1).toMatchObject({ content: "第六課", homework: "生字一行", updatedBy: "agent：課表助手" });
+    expect(v.lessons.find((l) => l.weekday === 2 && l.periodId === p2.id)).toMatchObject({ content: "分數加法", bring: "量角器" });
+  });
+
+  it("其中一格有錯時整批都不寫入", async () => {
+    const { c, p1, k } = await setup();
+    const r = await tool(k.key, "set_week_plan", {
+      weekStart: "2026-11-30",
+      lessons: [
+        { weekday: 1, periodId: p1.id, content: "應該不會寫入" },
+        { weekday: 9, periodId: p1.id, content: "錯的星期" },
+      ],
+    });
+    expect(r.isError).toBe(true);
+    const v = await ok(api<WeekView>(c, "GET", "/api/week/2026-11-30"));
+    expect(v.lessons.every((l) => l.content === "")).toBe(true);
+  });
+
+  it("agent 不能換課、停課、改節次或固定課表", async () => {
+    const { p1, k } = await setup();
+    for (const name of ["create_period", "update_period", "delete_period", "set_slot", "change_lesson", "cancel_lesson", "copy_last_week"]) {
+      const r = await mcp(k.key, "tools/call", { name, arguments: {} });
+      expect(r.body?.error ?? r.body?.result?.isError, name).toBeTruthy();
+    }
+    // set_week_plan 只收內容、作業、要帶的東西；夾帶換課或停課也不會生效
+    await tool(k.key, "set_week_plan", { weekStart: "2026-12-07", lessons: [{ weekday: 1, periodId: p1.id, content: "x", cancelled: true, change: { groupId: null, subject: "偷換" } }] });
+    const w = await tool(k.key, "get_week", { weekStart: "2026-12-07" });
+    expect((w.value as WeekView).lessons.find((l) => l.weekday === 1 && l.periodId === p1.id)).toMatchObject({ cancelled: false, changed: false, subject: "國語" });
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "../shared/types";
 import type { Env } from "./env";
 import { BoardStore, type AgentIdentity } from "./boards";
+import { ScheduleStore } from "./schedule";
 import { bool, fail, idList, InputError, int, newId, newSessionToken, ok, sha256Hex, text, type Body, type Result } from "./validate";
 
 // 一套部署只有一個班級，全部資料放在這一個 Durable Object 的 SQLite 裡。
@@ -41,6 +42,7 @@ async function reply(run: () => Result | Promise<Result>): Promise<{ status: num
 export class ClassroomDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private board: BoardStore;
+  private schedule: ScheduleStore;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -72,6 +74,7 @@ export class ClassroomDO extends DurableObject<Env> {
         PRIMARY KEY (reward_id, student_id));
     `);
     this.board = new BoardStore(this.sql, ctx.storage);
+    this.schedule = new ScheduleStore(this.sql, ctx.storage);
   }
 
   /* ---------- 登入與工作階段 ---------- */
@@ -143,7 +146,22 @@ export class ClassroomDO extends DurableObject<Env> {
   async agentTool(key: string, name: string, args: Body): Promise<{ status: number; json: string }> {
     const agent = await this.board.agentAuth(key, false);
     if (!agent) return { status: 401, json: JSON.stringify({ error: "金鑰無效或已停用" }) };
-    return reply(() => this.board.agentTool(agent, name, args ?? {}));
+    return reply(() => this.agentCall(agent, name, args ?? {}));
+  }
+
+  // agent 能呼叫的工具：課表三個在這裡，其餘（組別、面板、卡片）在 BoardStore.agentTool；
+  // 兩邊都不認得的名稱一律拒絕。換課、停課、改節次與固定課表只有老師能做。
+  private agentCall(agent: AgentIdentity, name: string, args: Body): Result {
+    switch (name) {
+      case "get_timetable":
+        return ok({ periods: this.schedule.periods(), slots: this.schedule.slots(), groups: this.board.activeGroups() });
+      case "get_week":
+        return this.schedule.week(args.weekStart);
+      case "set_week_plan":
+        return this.schedule.setWeekPlan(`agent：${agent.name}`, args);
+      default:
+        return this.board.agentTool(agent, name, args);
+    }
   }
 
   private route(me: Me, method: string, path: string[], body: Body): Result | Promise<Result> {
@@ -202,6 +220,20 @@ export class ClassroomDO extends DurableObject<Env> {
         return this.board.createKey(me.email, body);
       case "PATCH agent-keys/:id":
         return this.board.updateKey(id, body);
+      case "POST periods":
+        return this.schedule.createPeriod(body);
+      case "PATCH periods/:id":
+        return this.schedule.updatePeriod(id, body);
+      case "DELETE periods/:id":
+        return this.schedule.deletePeriod(id);
+      case "PUT slots":
+        return this.schedule.setSlot(body);
+      case "GET week/:id":
+        return this.schedule.week(id);
+      case "POST week/:id/copy-last":
+        return this.schedule.copyLastWeek(id, me.email);
+      case "PUT lessons":
+        return this.schedule.setLesson(me.email, body);
       default:
         return fail(404, "找不到這個功能");
     }
@@ -584,6 +616,8 @@ export class ClassroomDO extends DurableObject<Env> {
       boards: this.board.boards(),
       share: this.board.share(),
       agentKeys: this.board.agentKeys(),
+      periods: this.schedule.periods(),
+      slots: this.schedule.slots(),
     };
   }
 }
