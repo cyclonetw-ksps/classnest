@@ -133,7 +133,7 @@ export function App() {
         {tab === "board" && <BoardPanel state={state} act={act} />}
         {tab === "schedule" && <SchedulePanel state={state} act={act} />}
         {/* 大螢幕一直掛著，切到其他分頁時計時與提示音照常 */}
-        <ScreenPanel hidden={tab !== "screen"} />
+        <ScreenPanel hidden={tab !== "screen"} state={state} />
         {tab === "students" && <StudentsPanel state={state} act={act} />}
         {tab === "groups" && <GroupsPanel state={state} act={act} />}
         {tab === "reasons" && <ReasonsPanel state={state} act={act} />}

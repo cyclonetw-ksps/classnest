@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { atClock, formatClock, formatRemaining, parseClock, parseMinutes, TIMER_MAX_MINUTES } from "../shared/clock";
+import { bellAt, bellChimes, bellKey, type Bell as BellState, type BellLesson } from "../shared/bell";
+import { atClock, formatClock, formatRemaining, parseClock, parseMinutes, remainingFraction, remainingMs, TIMER_MAX_MINUTES } from "../shared/clock";
 import { chimeDue, pauseRun, restartRun, resumeRun, runView, startRun, type Run } from "../shared/timer";
+import type { ClassState, WeekView } from "../shared/types";
+import { localDate, mondayOf, weekdayOf } from "../shared/week";
+import { request } from "./api";
 import { playChime, readMuted, unlockChime, writeMuted } from "./chime";
+import { paperAt } from "./palette";
 import { Bell, BellOff, Expand, Pause, Play, Restart, Shrink, Stop } from "./icons";
 
-// 大螢幕：投影用的計時畫面。只有計時，不放任何學生資料或分數。
+// 大螢幕：投影用的計時畫面。只有計時與組別、科目，不放任何學生資料或分數。
+// 兩種模式：計時（自訂分鐘或倒數到時刻），以及依課表（讀本週課表，自動倒數下課與上課，判斷在 src/shared/bell.ts）。
 // 計時以結束時刻為準（endAt），每次重畫都用裝置時鐘重新算，背景分頁回來也不會飄。
 // 狀態轉移（暫停、繼續、重來、何時響）在 src/shared/timer.ts，有測試。
 
@@ -15,7 +21,34 @@ function reducedMotion() {
   return matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function ScreenPanel({ hidden }: { hidden: boolean }) {
+// 這一節沒有排組別也沒有科目，就是空堂
+const isFree = (l: BellLesson | null) => !l || (!l.subject && !l.groupId);
+
+// 依課表模式的標題：這一段是什麼。空堂與停課不寫「上課」，免得和下面的內容矛盾
+function bellLabel(b: BellState, known: boolean): string {
+  const what = (l: BellLesson | null, during: string) => (!known ? during : l?.cancelled ? "停課" : isFree(l) ? "空堂" : during);
+  switch (b.kind) {
+    case "class":
+      return `${b.period.label}　${what(b.lesson, "上課中")}`;
+    case "break":
+      return `下課　${b.period.label} ${b.period.start} ${what(b.lesson, "上課")}`;
+    case "before":
+      return `${b.period.label} ${b.period.start} ${what(b.lesson, "上課")}`;
+    case "after":
+      return "今天的課都上完了";
+    case "weekend":
+      return "今天沒有排課";
+    case "no-periods":
+      return "還沒有設定節次";
+  }
+}
+
+export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassState }) {
+  const [mode, setMode] = useState<"timer" | "schedule">("timer");
+  const [week, setWeek] = useState<WeekView | null>(null);
+  const [weekError, setWeekError] = useState("");
+  const lastBell = useRef<string | null>(null);
+  const lastTick = useRef(0);
   const [run, setRun] = useState<Run | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [muted, setMuted] = useState(() => readMuted());
@@ -34,9 +67,55 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
   const { remaining, done, running, frac } = runView(run, now);
   const canFull = typeof document !== "undefined" && !!document.fullscreenEnabled;
 
+  // 依課表：今天是星期幾、這週的課、現在是哪一段
+  const scheduling = mode === "schedule";
+  const today = localDate(new Date(now));
+  const weekday = weekdayOf(today);
+  const monday = mondayOf(today);
+  // 還沒讀到這週的課（剛打開或讀取失敗）時，不知道每節排了什麼，畫面不寫「空堂」
+  const known = week?.weekStart === monday;
+  const todayLessons = known ? week.lessons.filter((l) => l.date === today) : [];
+  const bell = scheduling ? bellAt(now, weekday, state.periods, todayLessons) : null;
+  const bellKeyNow = bell ? bellKey(bell) : null;
+  const counting = bell && "endsAt" in bell ? bell : null;
+  const bellLeft = counting ? remainingMs(counting.endsAt, now) : 0;
+  const groupName = (id: string | null) => (id ? (state.groups.find((g) => g.id === id)?.name ?? "") : "");
+  const groupHue = (id: string | null) => (id ? paperAt(state.groups.findIndex((g) => g.id === id)).hue : null);
+
+  // 依課表模式讀本週課表：開始時、換週、老師在其他分頁改過資料後，以及每 10 分鐘
+  useEffect(() => {
+    if (!scheduling || weekday >= 6) return;
+    let live = true;
+    const load = () =>
+      request<WeekView>("GET", `week/${monday}`)
+        .then((w) => {
+          if (!live) return;
+          setWeek(w);
+          setWeekError("");
+        })
+        .catch(() => live && setWeekError("讀不到這週的課表，先只依節次時間倒數。"));
+    void load();
+    const id = setInterval(load, 10 * 60_000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [scheduling, monday, weekday >= 6, state]);
+
+  // 依課表：進入上課或離開上課的那一刻響（第一次打開、分頁在背景很久才回來都不響）
+  useEffect(() => {
+    const prev = lastBell.current;
+    const gap = lastTick.current ? now - lastTick.current : 0;
+    lastBell.current = bellKeyNow;
+    lastTick.current = bellKeyNow ? now : 0;
+    if (!bell || !bellKeyNow || !bellChimes(prev, bellKeyNow, gap)) return;
+    setAnnounce(bell.kind === "class" ? `上課：${bell.period.label}` : "下課");
+    if (!mutedRef.current) playChime();
+  }, [bellKeyNow, now]);
+
   // 跑的時候每 250 毫秒重畫一次；切回這個分頁時立刻補算
   useEffect(() => {
-    if (!running || done) return;
+    if (!scheduling && (!running || done)) return;
     const tick = () => setNow(Date.now());
     const id = setInterval(tick, 250);
     document.addEventListener("visibilitychange", tick);
@@ -44,7 +123,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [running, done]);
+  }, [running, done, scheduling]);
 
   // 時間到：同一次計時只響一次
   useEffect(() => {
@@ -54,9 +133,10 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
     if (!mutedRef.current) playChime();
   }, [done, run, now]);
 
-  // 計時中（含時間到的畫面）盡量不讓螢幕熄滅；瀏覽器不支援就算了
+  // 計時中（含時間到的畫面）與依課表模式盡量不讓螢幕熄滅；瀏覽器不支援就算了
+  const keepAwake = running || scheduling;
   useEffect(() => {
-    if (!running || !("wakeLock" in navigator)) return;
+    if (!keepAwake || !("wakeLock" in navigator)) return;
     let lock: WakeLockSentinel | null = null;
     let stopped = false;
     const acquire = async () => {
@@ -76,7 +156,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
       document.removeEventListener("visibilitychange", acquire);
       void lock?.release().catch(() => {});
     };
-  }, [running]);
+  }, [keepAwake]);
 
   useEffect(() => {
     const onChange = () => setFull(!!stageRef.current && document.fullscreenElement === stageRef.current);
@@ -84,13 +164,28 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  function scrollToStage() {
+    if (!full) stageRef.current?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+  }
+
+  function startSchedule() {
+    unlockChime();
+    lastBell.current = null;
+    setRun(null);
+    setNow(Date.now());
+    setMode("schedule");
+    setAnnounce("開始依課表倒數");
+    scrollToStage();
+  }
+
   function begin(next: Run, said: string) {
     unlockChime();
     const t = Date.now();
     setNow(t);
+    setMode("timer");
     setRun(next);
     setAnnounce(said);
-    if (!full) stageRef.current?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    scrollToStage();
   }
 
   function startMinutes(m: number) {
@@ -145,6 +240,11 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
   }
 
   function end() {
+    if (scheduling) {
+      setMode("timer");
+      setAnnounce("已結束依課表倒數");
+      return;
+    }
     setRun(null);
     setAnnounce("已結束計時");
   }
@@ -164,8 +264,16 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
     }
   }
 
-  const time = formatRemaining(remaining);
-  const stageClass = ["stage", done && "done", run?.paused != null && "paused", !run && "idle"].filter(Boolean).join(" ");
+  const time = formatRemaining(scheduling ? bellLeft : remaining);
+  const dialFrac = scheduling ? (counting ? remainingFraction(bellLeft, counting.total) : 1) : frac;
+  const idle = scheduling ? !counting : !run;
+  const lesson = counting?.lesson ?? null;
+  const wedge = counting && lesson && !lesson.cancelled ? groupHue(lesson.groupId) : null;
+  // 組別色小方塊永遠跟著組別（停課也一樣），沒有組別就不畫
+  const swatch = lesson ? groupHue(lesson.groupId) : null;
+  const lessonText = lesson ? [groupName(lesson.groupId), lesson.subject].filter((x, i, a) => x && a.indexOf(x) === i).join("・") : "";
+  const stageClass = ["stage", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
+  const label = bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
 
   return (
     <section aria-labelledby="screen-title" class="screen" hidden={hidden}>
@@ -176,6 +284,31 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
 
       <div class="screen-layout">
         <div class="screen-setup">
+          <div class="card setup-block">
+            <h3>依課表</h3>
+            {!state.periods.length ? (
+              <p class="meta">
+                還沒有節次。先到<a href="#schedule">課表</a>設定每一節的時間。
+              </p>
+            ) : (
+              <p class="meta phrases">
+                <span>依節次與這週的課自動倒數，</span>
+                <span>並提醒下一節要帶什麼。</span>
+              </p>
+            )}
+            {scheduling ? (
+              <p class="bell-on" role="status">
+                {state.periods.length ? "正在依課表倒數" : "等你設定好節次就開始"}
+              </p>
+            ) : (
+              <div class="form-actions start">
+                <button class="btn primary" type="button" onClick={startSchedule}>
+                  依課表自動倒數
+                </button>
+              </div>
+            )}
+          </div>
+
           <form
             class="card setup-block"
             onSubmit={(e) => {
@@ -266,16 +399,16 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
 
         <div class={stageClass} ref={stageRef}>
           <div class="stage-inner">
-            <p class="stage-label">{run ? run.label : "還沒開始計時"}</p>
+            <p class="stage-label">{label}</p>
             <div class="stage-body">
               <div class="dial">
                 <progress
                   class="dial-face"
                   max={1}
-                  value={frac}
+                  value={dialFrac}
                   aria-label="剩餘時間"
-                  aria-valuetext={!run ? "尚未開始" : done ? "時間到" : `剩 ${time}`}
-                  style={{ "--value": String(frac) }}
+                  aria-valuetext={idle ? "尚未開始" : !scheduling && done ? "時間到" : `剩 ${time}`}
+                  style={wedge ? { "--value": String(dialFrac), "--wedge": wedge } : { "--value": String(dialFrac) }}
                 />
                 <svg class="dial-ticks" viewBox="0 0 100 100" aria-hidden="true">
                   {TICKS.map((deg) => (
@@ -283,33 +416,66 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
                   ))}
                 </svg>
               </div>
-              <div class="stage-readout" aria-hidden="true" hidden={!run}>
-                {done ? (
-                  <p class="stage-done">時間到</p>
-                ) : (
-                  <p class={`stage-time ${time.length > 5 ? "long" : ""}`}>{time}</p>
-                )}
-                {run?.paused != null && <p class="stage-tag">暫停中</p>}
-              </div>
+              {!scheduling && (
+                <div class="stage-readout" aria-hidden="true" hidden={!run}>
+                  {done ? (
+                    <p class="stage-done">時間到</p>
+                  ) : (
+                    <p class={`stage-time ${time.length > 5 ? "long" : ""}`}>{time}</p>
+                  )}
+                  {run?.paused != null && <p class="stage-tag">暫停中</p>}
+                </div>
+              )}
+              {scheduling && (
+                <div class="stage-readout">
+                  {counting && (
+                    <p class={`stage-time ${time.length > 5 ? "long" : ""}`} aria-hidden="true">
+                      {time}
+                    </p>
+                  )}
+                  {counting && known && (
+                    <div key={bellKeyNow} class="stage-lesson" style={swatch ? { "--paper": swatch } : undefined}>
+                      <p class={`stage-lesson-what ${swatch ? "" : "no-group"}`}>
+                        {counting.kind !== "class" && <span class="stage-lesson-next">下一節</span>}
+                        {lessonText || "空堂"}
+                      </p>
+                      {lesson?.cancelled && <p class="stage-tag stage-cancel">停課{lesson.note && `・${lesson.note}`}</p>}
+                      {counting.kind !== "class" && lesson && !lesson.cancelled && lesson.bring && <p class="stage-lesson-bring">要帶：{lesson.bring}</p>}
+                    </div>
+                  )}
+                  {bell?.kind === "no-periods" && (
+                    <a class="btn stage-main" href="#schedule">
+                      到課表設定節次
+                    </a>
+                  )}
+                  {(bell?.kind === "after" || bell?.kind === "weekend") && (
+                    <p class="stage-note phrases">
+                      <span>上課日會依課表自動倒數，</span>
+                      <span>這一頁開著就好。</span>
+                    </p>
+                  )}
+                  {weekError && <p class="stage-note">{weekError}</p>}
+                </div>
+              )}
             </div>
             <div class="stage-bar">
               <div class="stage-group">
-              {run?.kind === "minutes" && !done && (
+              {!scheduling && run?.kind === "minutes" && !done && (
                 <button class="btn stage-main" onClick={run.paused === null ? pause : resume}>
                   {run.paused === null ? <Pause /> : <Play />}
                   {run.paused === null ? "暫停" : "繼續"}
                 </button>
               )}
-              {run?.kind === "minutes" && (
+              {!scheduling && run?.kind === "minutes" && (
                 <button class={`btn ${done ? "stage-main" : ""}`} onClick={restart}>
                   <Restart />
                   重來
                 </button>
               )}
-              {run && (
+              {(scheduling || run) && (
                 <button class="btn" onClick={end}>
                   <Stop />
-                  結束
+                  {scheduling ? "結束依課表" : "結束"}
                 </button>
               )}
               </div>
@@ -318,7 +484,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
                 {muted ? <BellOff /> : <Bell />}
                 靜音
               </button>
-              {!muted && !run && (
+              {!muted && idle && (
                 <button
                   class="btn"
                   onClick={() => {
