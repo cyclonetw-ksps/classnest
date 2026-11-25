@@ -133,3 +133,9 @@ export const Shrink = () => (
     <path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5" />
   </svg>
 );
+
+export const Swap = () => (
+  <svg {...base}>
+    <path d="M4 7h11M12 4l3 3-3 3M16 13H5M8 10l-3 3 3 3" />
+  </svg>
+);
