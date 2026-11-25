@@ -25,8 +25,8 @@ function reducedMotion() {
 const isFree = (l: BellLesson | null) => !l || (!l.subject && !l.groupId);
 
 // 依課表模式的標題：這一段是什麼。空堂與停課不寫「上課」，免得和下面的內容矛盾
-function bellLabel(b: BellState): string {
-  const what = (l: BellLesson | null, during: string) => (l?.cancelled ? "停課" : isFree(l) ? "空堂" : during);
+function bellLabel(b: BellState, known: boolean): string {
+  const what = (l: BellLesson | null, during: string) => (!known ? during : l?.cancelled ? "停課" : isFree(l) ? "空堂" : during);
   switch (b.kind) {
     case "class":
       return `${b.period.label}　${what(b.lesson, "上課中")}`;
@@ -48,6 +48,7 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   const [week, setWeek] = useState<WeekView | null>(null);
   const [weekError, setWeekError] = useState("");
   const lastBell = useRef<string | null>(null);
+  const lastTick = useRef(0);
   const [run, setRun] = useState<Run | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [muted, setMuted] = useState(() => readMuted());
@@ -71,7 +72,9 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   const today = localDate(new Date(now));
   const weekday = weekdayOf(today);
   const monday = mondayOf(today);
-  const todayLessons = week?.weekStart === monday ? week.lessons.filter((l) => l.date === today) : [];
+  // 還沒讀到這週的課（剛打開或讀取失敗）時，不知道每節排了什麼，畫面不寫「空堂」
+  const known = week?.weekStart === monday;
+  const todayLessons = known ? week.lessons.filter((l) => l.date === today) : [];
   const bell = scheduling ? bellAt(now, weekday, state.periods, todayLessons) : null;
   const bellKeyNow = bell ? bellKey(bell) : null;
   const counting = bell && "endsAt" in bell ? bell : null;
@@ -99,14 +102,16 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
     };
   }, [scheduling, monday, weekday >= 6, state]);
 
-  // 依課表：進入上課或離開上課的那一刻響（第一次打開不響）
+  // 依課表：進入上課或離開上課的那一刻響（第一次打開、分頁在背景很久才回來都不響）
   useEffect(() => {
     const prev = lastBell.current;
+    const gap = lastTick.current ? now - lastTick.current : 0;
     lastBell.current = bellKeyNow;
-    if (!bell || !bellKeyNow || !bellChimes(prev, bellKeyNow)) return;
+    lastTick.current = bellKeyNow ? now : 0;
+    if (!bell || !bellKeyNow || !bellChimes(prev, bellKeyNow, gap)) return;
     setAnnounce(bell.kind === "class" ? `上課：${bell.period.label}` : "下課");
     if (!mutedRef.current) playChime();
-  }, [bellKeyNow]);
+  }, [bellKeyNow, now]);
 
   // 跑的時候每 250 毫秒重畫一次；切回這個分頁時立刻補算
   useEffect(() => {
@@ -268,7 +273,7 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   const swatch = lesson ? groupHue(lesson.groupId) : null;
   const lessonText = lesson ? [groupName(lesson.groupId), lesson.subject].filter((x, i, a) => x && a.indexOf(x) === i).join("・") : "";
   const stageClass = ["stage", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
-  const label = bell ? bellLabel(bell) : run ? run.label : "還沒開始計時";
+  const label = bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
 
   return (
     <section aria-labelledby="screen-title" class="screen" hidden={hidden}>
@@ -428,7 +433,7 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                       {time}
                     </p>
                   )}
-                  {counting && (
+                  {counting && known && (
                     <div key={bellKeyNow} class="stage-lesson" style={swatch ? { "--paper": swatch } : undefined}>
                       <p class={`stage-lesson-what ${swatch ? "" : "no-group"}`}>
                         {counting.kind !== "class" && <span class="stage-lesson-next">下一節</span>}

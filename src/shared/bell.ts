@@ -46,8 +46,12 @@ export function bellKey(b: Bell): string {
   return "period" in b ? `${b.kind}:${b.period.id}` : b.kind;
 }
 
-// 進入上課或離開上課的那一刻響；第一次打開（沒有上一個狀態）不響
-export function bellChimes(prev: string | null, next: string): boolean {
-  if (prev === null || prev === next) return false;
+// 兩次更新相隔超過這麼久（分頁在背景被暫停），跨過的上下課就不補響
+export const STALE_MS = 5_000;
+
+// 進入上課或離開上課的那一刻響；第一次打開（沒有上一個狀態）不響。
+// gapMs 是這次和上一次更新畫面相隔多久，太久代表那一刻早就過了
+export function bellChimes(prev: string | null, next: string, gapMs = 0): boolean {
+  if (prev === null || prev === next || gapMs > STALE_MS) return false;
   return prev.startsWith("class:") || next.startsWith("class:");
 }

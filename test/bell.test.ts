@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BEFORE_WINDOW_MS, bellAt, bellChimes, bellKey, type BellLesson } from "../src/shared/bell";
+import { BEFORE_WINDOW_MS, bellAt, bellChimes, bellKey, STALE_MS, type BellLesson } from "../src/shared/bell";
 import type { Period } from "../src/shared/types";
 
 // 2026-11-25 是週三；用當地時間建時刻，任何時區跑都一樣
@@ -85,5 +85,12 @@ describe("提示音", () => {
     expect(bellChimes(null, key(8, 50))).toBe(false);
     expect(bellChimes(key(7, 0), key(8, 0))).toBe(false);
     expect(bellChimes(key(16, 0), key(17, 0))).toBe(false);
+  });
+
+  it("分頁在背景很久、回來時才發現跨過上下課：不補響過期的提示音", () => {
+    expect(STALE_MS).toBe(5_000);
+    expect(bellChimes(key(9, 29), key(9, 30), 250)).toBe(true);
+    expect(bellChimes(key(9, 29), key(9, 30), 4_000)).toBe(true);
+    expect(bellChimes(key(9, 0), key(9, 30), 30 * MIN)).toBe(false);
   });
 });
