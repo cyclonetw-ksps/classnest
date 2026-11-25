@@ -3,8 +3,10 @@
 // `pnpm test` 第一步就跑這支；找到任何一個就列出檔名與行號並失敗。
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+// 用 fileURLToPath，路徑有空白或中文時才不會變成 %20 而什麼都沒掃到
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 // 要檢查的檔案與資料夾（相對於 repo 根目錄）；不存在的略過
 const TARGETS = [
@@ -21,8 +23,11 @@ const TARGETS = [
   "package.json",
   "vite.config.ts",
   "vitest.config.ts",
+  "tsconfig.json",
   ".dev.vars.example",
 ];
+// 這些一定存在；找不到代表路徑算錯，直接失敗，不要悄悄放行
+const REQUIRED = ["src", "package.json"];
 const SKIP_DIRS = new Set(["node_modules", "dist", ".wrangler", ".git"]);
 const TEXT = /\.(ts|tsx|js|mjs|cjs|json|jsonc|md|yml|yaml|html|css|example|txt)$/;
 
@@ -56,6 +61,13 @@ function files(path) {
     else if (TEXT.test(name)) out.push(child);
   }
   return out;
+}
+
+for (const t of REQUIRED) {
+  if (files(join(root, t)).length === 0) {
+    console.error(`check-private：找不到 ${t}（${join(root, t)}），沒辦法檢查`);
+    process.exit(1);
+  }
 }
 
 const problems = [];

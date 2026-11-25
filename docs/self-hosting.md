@@ -143,6 +143,9 @@ GitHub 的 Variables 分頁還沒有 `GOOGLE_CLIENT_ID`，或名稱拼錯（要�
 **登入按鈕出不來，或出現 `origin_mismatch`**
 Google 用戶端的「已授權的 JavaScript 來源」和你的網址不一樣。檢查有沒有 `https://`、子網域拼字、結尾有沒有多一個 `/`。改完可能要等一陣子才生效。
 
+**同事按 Google 登入時，被 Google 擋下（例如「存取遭拒」或「這個應用程式未經驗證」）**
+依 Google 的說明，只用 Sign in with Google 登入的應用程式在 Testing 狀態下，不需要把使用者加進測試名單（[來源](https://support.google.com/cloud/answer/15549945)）。萬一還是被擋，擇一處理：到 Google Auth Platform → **Audience**，按 **Publish app** 發布成 In production（只用登入需要的基本資料，不需要 Google 審核）；或在同一頁的 Test users 加入他的信箱。
+
 **用 Google 登入後說「不在老師名單內」**
 你登入的帳號不是 `FIRST_TEACHER_EMAIL`，或還沒被邀請。先確認 GitHub secret 的信箱，改了之後要重新部署一次（第 5 步）。
 
