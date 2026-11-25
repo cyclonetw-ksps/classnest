@@ -498,7 +498,7 @@ function WeekPlan({ state, act }: { state: ClassState; act: Act }) {
               const label = `${WEEKDAY_NAMES[weekday]}${p.label}`;
               return (
                 <button
-                  class={`lesson ${l.cancelled ? "cancelled" : ""} ${!l.subject && !l.content ? "blank" : ""}`}
+                  class={`lesson ${l.cancelled ? "cancelled" : ""} ${!l.subject && !l.content && !l.homework && !l.bring ? "blank" : ""}`}
                   style={l.groupId ? { "--paper": paperAt(colorOf(l.groupId)).hue } : undefined}
                   onClick={() => open(l)}
                 >
@@ -514,7 +514,7 @@ function WeekPlan({ state, act }: { state: ClassState; act: Act }) {
                       )}
                     </span>
                   )}
-                  {l.subject ? <span class="lesson-subject">{l.subject}</span> : !l.content && <Blank />}
+                  {l.subject ? <span class="lesson-subject">{l.subject}</span> : !l.content && !l.homework && !l.bring && <Blank />}
                   {l.groupId && nameOf(l.groupId) !== l.subject && <span class="lesson-group">{nameOf(l.groupId)}</span>}
                   {/* 停課的課不顯示內容、作業與要帶的東西，免得學生替停掉的課準備 */}
                   {!l.cancelled && l.content && <span class="lesson-line lesson-content">{l.content}</span>}

@@ -155,8 +155,13 @@ export class ClassroomDO extends DurableObject<Env> {
     switch (name) {
       case "get_timetable":
         return ok({ periods: this.schedule.periods(), slots: this.schedule.slots(), groups: this.board.activeGroups() });
-      case "get_week":
-        return this.schedule.week(args.weekStart);
+      case "get_week": {
+        // 老師的信箱不給 agent：老師寫的只標「老師」，agent 寫的保留金鑰名稱
+        const week = this.schedule.week(args.weekStart);
+        if (!week.ok) return week;
+        const lessons = week.value.lessons.map((l) => ({ ...l, updatedBy: !l.updatedBy || l.updatedBy.startsWith("agent：") ? l.updatedBy : "老師" }));
+        return ok({ ...week.value, lessons });
+      }
       case "set_week_plan":
         return this.schedule.setWeekPlan(`agent：${agent.name}`, args);
       default:

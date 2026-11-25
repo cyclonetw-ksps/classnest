@@ -163,6 +163,19 @@ describe("MCP 課表工具", () => {
     expect(v.lessons.find((l) => l.weekday === 2 && l.periodId === p2.id)).toMatchObject({ content: "分數加法", bring: "量角器" });
   });
 
+  it("agent 讀某一週時看不到老師的信箱（只標『老師』），agent 自己寫的照樣標金鑰名稱", async () => {
+    const { c, p1, p2, k } = await setup();
+    await ok(api(c, "PUT", "/api/lessons", { weekStart: "2026-12-14", weekday: 1, periodId: p1.id, content: "老師寫的" }));
+    await tool(k.key, "set_week_plan", { weekStart: "2026-12-14", lessons: [{ weekday: 2, periodId: p2.id, content: "agent 寫的" }] });
+    const w = await tool(k.key, "get_week", { weekStart: "2026-12-14" });
+    expect(w.text).not.toContain(FIRST_TEACHER.toLowerCase());
+    const lessons = (w.value as WeekView).lessons;
+    expect(lessons.find((l) => l.weekday === 1 && l.periodId === p1.id)?.updatedBy).toBe("老師");
+    expect(lessons.find((l) => l.weekday === 2 && l.periodId === p2.id)?.updatedBy).toBe("agent：課表助手");
+    const teacherView = await ok(api<WeekView>(c, "GET", "/api/week/2026-12-14"));
+    expect(teacherView.lessons.find((l) => l.weekday === 1 && l.periodId === p1.id)?.updatedBy).toBe(FIRST_TEACHER.toLowerCase());
+  });
+
   it("其中一格有錯時整批都不寫入", async () => {
     const { c, p1, k } = await setup();
     const r = await tool(k.key, "set_week_plan", {
