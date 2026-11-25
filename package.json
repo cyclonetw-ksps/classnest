@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "test": "vite build && tsc --noEmit && vitest run",
+    "test": "node scripts/check-private.mjs && vite build && tsc --noEmit && vitest run",
     "typecheck": "tsc --noEmit",
-    "dev": "vite build && wrangler dev"
+    "dev": "vite build && wrangler dev",
+    "check:private": "node scripts/check-private.mjs"
   },
   "dependencies": {
     "preact": "10.29.8",

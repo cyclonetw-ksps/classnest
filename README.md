@@ -29,21 +29,26 @@ claude mcp add --transport http classnest https://<你的網站>/api/mcp --heade
 
 其他 agent 選 Streamable HTTP 類型的 MCP 伺服器，填同樣的網址與標頭即可。
 
-## 自架（簡要）
+## 自架
 
-完整安裝說明之後補上。需要：
+照 [docs/self-hosting.md](docs/self-hosting.md) 一步一步做，全部用免費方案，不用寫程式。重點：
 
-1. Cloudflare 帳號，以及一組「Edit Cloudflare Workers」範本建立的 API token。
-2. Google Cloud 的 OAuth 用戶端 ID（網頁應用程式），「已授權的 JavaScript 來源」填你的網站網址。
-3. 在 GitHub repo 的 Settings 設定：
+1. Fork 這個 repo，在 Actions 分頁啟用 workflow。
+2. Cloudflare：確認 workers.dev 子網域，複製帳號 ID，用「Edit Cloudflare Workers」範本建立 API token。
+3. Google Auth Platform：建立「網頁應用程式」用戶端，「已授權的 JavaScript 來源」填 `https://classnest.<你的子網域>.workers.dev`。
+4. GitHub 的 Settings → Secrets and variables → Actions：
    - Secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`FIRST_TEACHER_EMAIL`（第一位老師的 Google 信箱）
    - Variables：`GOOGLE_CLIENT_ID`
-4. 推到 `main` 後，GitHub Actions 會測試並部署到 `https://classnest.<你的子網域>.workers.dev`。
+5. Actions → CI → Run workflow（選 `main`）。之後 `main` 有更新就自動部署。
+
+程式與設定裡不放任何部署專屬的值；`pnpm test` 第一步會檢查。
 
 ## 開發
 
 ```bash
 pnpm install
+cp .dev.vars.example .dev.vars   # 本機開發用，填你自己的值；不會進 git
+pnpm dev
 pnpm test
 ```
 

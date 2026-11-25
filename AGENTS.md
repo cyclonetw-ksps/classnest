@@ -16,7 +16,8 @@
 - 一律用 pnpm。寫 code 先寫會失敗的測試（`test/`，跑在 Cloudflare 的 Workers 測試環境），確認紅燈再實作。
 - 只存顯示名、原班、導師稱呼、組別等必要資料；不加生日、身分證、障礙類別、家長電話等欄位。
 - 權限檢查一律在伺服器端。前端擋不算數。
-- 部署專屬的值（Google 用戶端 ID、第一位老師信箱、Cloudflare 憑證）不寫進 repo；在 GitHub 的 repo variables／secrets 設定，由 CI 部署時注入。
+- 部署專屬的值（Google 用戶端 ID、第一位老師信箱、Cloudflare 憑證）不寫進 repo；在 GitHub 的 repo variables／secrets 設定，由 CI 部署時注入；本機開發用 `.dev.vars`（範本是 `.dev.vars.example`）。`pnpm test` 第一步跑 `scripts/check-private.mjs`，擋真的信箱、workers.dev 網址、Google 用戶端 ID 與 Cloudflare 帳號 ID；範例一律用 `example.com`、`.test` 網域與 `<你的子網域>`。
+- 自架流程寫在 `docs/self-hosting.md`；改到部署、設定名稱或登入流程時要同步更新。
 - 不用付費功能；所有東西要在 Cloudflare 免費方案內。
 - 沒有任何免驗證或開發用的登入入口；`/api/auth/` 底下只有 `google` 與 `logout`（有測試擋）。
 - 前端互動元件先查 Modern Web Guidance 的現行寫法（原生 `<dialog>`、`:user-invalid` 等）。
