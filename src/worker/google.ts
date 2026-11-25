@@ -15,16 +15,36 @@ interface Jwk extends JsonWebKey {
   kid?: string;
 }
 
-let cache: { keys: Jwk[]; expires: number } | null = null;
+// Google 公開金鑰取不到（網路或 Google 端錯誤）：登入回 503，不是 500
+export class JwksUnavailableError extends Error {}
+
+// 遇到不認得的 kid 時強制重抓，但距離上次抓不到 60 秒就不重抓，免得任何人送假 kid 就讓伺服器一直外連
+const FORCE_REFRESH_MIN_MS = 60_000;
+let cache: { keys: Jwk[]; expires: number; fetchedAt: number } | null = null;
+
+// 只給測試用：清掉快取
+export function _resetJwksCache(): void {
+  cache = null;
+}
 
 async function jwks(forceRefresh: boolean): Promise<Jwk[]> {
   const now = Date.now();
-  if (!forceRefresh && cache && cache.expires > now) return cache.keys;
-  const res = await fetch(JWKS_URL);
-  if (!res.ok) throw new Error(`jwks ${res.status}`);
-  const body = (await res.json()) as { keys?: Jwk[] };
+  if (cache && (forceRefresh ? now - cache.fetchedAt < FORCE_REFRESH_MIN_MS : cache.expires > now)) return cache.keys;
+  let res: Response;
+  try {
+    res = await fetch(JWKS_URL);
+  } catch {
+    throw new JwksUnavailableError("jwks unreachable");
+  }
+  if (!res.ok) throw new JwksUnavailableError(`jwks ${res.status}`);
+  let body: { keys?: Jwk[] };
+  try {
+    body = (await res.json()) as { keys?: Jwk[] };
+  } catch {
+    throw new JwksUnavailableError("jwks not json");
+  }
   const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get("cache-control") ?? "")?.[1] ?? 3600);
-  cache = { keys: body.keys ?? [], expires: now + Math.min(maxAge, 86400) * 1000 };
+  cache = { keys: body.keys ?? [], expires: now + Math.min(maxAge, 86400) * 1000, fetchedAt: now };
   return cache.keys;
 }
 
@@ -42,7 +62,8 @@ function b64urlJson(s: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-// 回傳驗證過的身分；任何一項不符就回 null（不說明原因，避免給攻擊者線索）
+// 回傳驗證過的身分；任何一項不符就回 null（不說明原因，避免給攻擊者線索）。
+// 取不到 Google 公開金鑰時丟 JwksUnavailableError。
 export async function verifyGoogleIdToken(token: unknown, clientId: string | undefined): Promise<GoogleIdentity | null> {
   if (typeof token !== "string" || !clientId) return null;
   const parts = token.split(".");
@@ -61,7 +82,7 @@ export async function verifyGoogleIdToken(token: unknown, clientId: string | und
   if (header.alg !== "RS256" || typeof header.kid !== "string") return null;
 
   let jwk = (await jwks(false)).find((k) => k.kid === header.kid);
-  // Google 會輪換金鑰：找不到時重新抓一次
+  // Google 會輪換金鑰：找不到時重新抓一次（60 秒內最多一次）
   if (!jwk) jwk = (await jwks(true)).find((k) => k.kid === header.kid);
   if (!jwk) return null;
 

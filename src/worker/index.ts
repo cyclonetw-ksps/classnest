@@ -1,6 +1,6 @@
 import type { PublicConfig } from "../shared/types";
 import type { Env } from "./env";
-import { verifyGoogleIdToken } from "./google";
+import { JwksUnavailableError, verifyGoogleIdToken } from "./google";
 import { handleMcp } from "./mcp";
 export { ClassroomDO } from "./classroom";
 
@@ -70,7 +70,13 @@ async function handleApi(request: Request, env: Env, path: string[]): Promise<Re
     return json(config);
   }
   if (route === "POST auth/google") {
-    const identity = await verifyGoogleIdToken(body.credential, env.GOOGLE_CLIENT_ID);
+    let identity;
+    try {
+      identity = await verifyGoogleIdToken(body.credential, env.GOOGLE_CLIENT_ID);
+    } catch (e) {
+      if (e instanceof JwksUnavailableError) return error(503, "暫時連不到 Google 驗證登入，請稍後再試");
+      throw e;
+    }
     if (!identity) return error(401, "Google 登入驗證失敗，請重新登入");
     const token = await room.login(identity.email, identity.name, env.FIRST_TEACHER_EMAIL);
     if (!token) return error(403, "這個 Google 帳號不在老師名單內，請請已登入的老師邀請你");

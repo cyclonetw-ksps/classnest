@@ -348,6 +348,8 @@ dialog[open] { opacity: 1; }
 }
 .login h1 { font-family: var(--display); font-weight: 400; font-size: clamp(1.7rem, 4.6vw, 2.6rem); }
 .gsi { min-height: 44px; }
+/* Google 按鈕的 iframe 文件是淺色；iframe 元素的 color-scheme 跟著頁面變深色時，瀏覽器會替它墊一層不透明白底 */
+.gsi iframe { color-scheme: light; }
 .login-msg { min-height: 1.5em; color: var(--muted); }
 
 /* 獎勵卡內的學生清單是平的，不再疊一層卡片 */
@@ -497,6 +499,7 @@ dialog[open] { opacity: 1; }
 .key-view .field { gap: 8px; justify-items: start; }
 .field-label { font-weight: 700; }
 .key-warn { padding: 10px 14px; border-radius: 12px; border: 2px dashed var(--paper-sun); font-weight: 600; }
+code.secret .nobr { white-space: nowrap; }
 code.secret {
   display: block; justify-self: stretch; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line-strong);
   background: var(--sheet); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9rem; overflow-wrap: anywhere; user-select: all;

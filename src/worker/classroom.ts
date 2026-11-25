@@ -139,9 +139,9 @@ export class ClassroomDO extends DurableObject<Env> {
     return this.board.agentAuth(key);
   }
 
-  // 每次呼叫都重新驗金鑰，停用的金鑰立即失效
+  // 每次呼叫都重新驗金鑰，停用的金鑰立即失效；最後使用時間已在 agentAuth 記過，這裡不再寫
   async agentTool(key: string, name: string, args: Body): Promise<{ status: number; json: string }> {
-    const agent = await this.board.agentAuth(key);
+    const agent = await this.board.agentAuth(key, false);
     if (!agent) return { status: 401, json: JSON.stringify({ error: "金鑰無效或已停用" }) };
     return reply(() => this.board.agentTool(agent, name, args ?? {}));
   }
