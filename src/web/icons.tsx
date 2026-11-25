@@ -82,3 +82,54 @@ export const Share = () => (
     <path d="M7 9l6-3M7 11l6 3" />
   </svg>
 );
+
+export const Play = () => (
+  <svg {...base}>
+    <path d="M6 4l10 6-10 6z" />
+  </svg>
+);
+
+export const Pause = () => (
+  <svg {...base}>
+    <path d="M7 4v12M13 4v12" />
+  </svg>
+);
+
+export const Restart = () => (
+  <svg {...base}>
+    <path d="M4 10a6 6 0 106-6H7" />
+    <path d="M9 1.5L6.5 4 9 6.5" />
+  </svg>
+);
+
+export const Stop = () => (
+  <svg {...base}>
+    <rect x="5" y="5" width="10" height="10" rx="1.5" />
+  </svg>
+);
+
+export const Bell = () => (
+  <svg {...base}>
+    <path d="M5 14V9a5 5 0 0110 0v5l1.5 1.5h-13z" />
+    <path d="M8.5 17.5a1.5 1.5 0 003 0" />
+  </svg>
+);
+
+export const BellOff = () => (
+  <svg {...base}>
+    <path d="M7 5.2A5 5 0 0115 9v4M5 9v5l-1.5 1.5H15" />
+    <path d="M8.5 17.5a1.5 1.5 0 003 0M3 3l14 14" />
+  </svg>
+);
+
+export const Expand = () => (
+  <svg {...base}>
+    <path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5" />
+  </svg>
+);
+
+export const Shrink = () => (
+  <svg {...base}>
+    <path d="M8 3v5H3M17 8h-5V3M12 17v-5h5M3 12h5v5" />
+  </svg>
+);

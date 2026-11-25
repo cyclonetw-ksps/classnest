@@ -519,3 +519,115 @@ code.secret {
 .pin-input[aria-invalid="true"] { border-color: var(--danger) !important; background: var(--danger-soft) !important; }
 .login-site { font-family: var(--display); font-size: var(--fs-subhead); color: var(--muted); }
 .login-msg.error { color: var(--danger); font-weight: 600; }
+
+/* ---------- 大螢幕：投影用計時 ---------- */
+.screen-layout { display: grid; gap: 20px; align-items: start; }
+@media (min-width: 1000px) { .screen-layout { grid-template-columns: 21rem minmax(0, 1fr); } }
+.screen-setup { display: grid; gap: 16px; min-width: 0; }
+.screen .setup-block h3 { margin: 0 0 12px; }
+.screen .setup-block .field:last-child { margin-bottom: 0; }
+.presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.preset {
+  min-block-size: 48px; padding: 4px 10px; white-space: nowrap; font-size: 0.85rem; border-radius: 12px; cursor: pointer;
+  border: 1.5px solid var(--line-strong); background: var(--sheet); font-weight: 600;
+  transition: border-color 0.15s var(--ease-out), transform 0.15s var(--ease-out);
+}
+.preset b { font-family: var(--display); font-weight: 400; font-size: 1.35rem; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.preset:hover { border-color: var(--accent); }
+.preset:active { transform: translateY(1px); }
+/* 自訂分鐘用數字鍵盤輸入，不要瀏覽器的上下小箭頭 */
+.screen input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.screen input[type="number"]::-webkit-inner-spin-button, .screen input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.field-error { color: var(--danger); font-size: 0.9rem; font-weight: 600; }
+.field-error:empty { display: none; }
+input.has-error { border-color: var(--danger); background: var(--danger-soft); }
+
+/* 舞台是一塊絨布，上面釘一個紙做的鐘面；深淺色模式都一樣是絨布，投影時對比最穩 */
+@property --value { syntax: "<number>"; inherits: true; initial-value: 1; }
+.stage {
+  container: stage / size;
+  height: clamp(30rem, 78svh, 54rem); min-width: 0; position: relative;
+  background: var(--felt); color: var(--felt-ink); border-radius: var(--r);
+  box-shadow: inset 0 2px 10px rgb(0 0 0 / 0.18);
+}
+.stage:fullscreen { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+.stage::backdrop { background: var(--felt); }
+.stage-inner {
+  height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); gap: 2cqh;
+  padding: clamp(14px, 3cqmin, 48px);
+}
+.stage-label {
+  text-align: center; font-family: var(--display); color: var(--felt-muted); line-height: 1.2;
+  font-size: clamp(1.25rem, min(4.6cqw, 6cqh), 4.5rem); overflow-wrap: anywhere;
+}
+.stage-body { display: grid; grid-auto-flow: column; place-content: center; place-items: center; gap: 2cqh 4cqw; min-height: 0; }
+.dial {
+  --d: min(62cqh, 40cqw);
+  /* 鐘面是投影出去的東西：深淺色模式都用白紙與番茄紅，對比才穩 */
+  --card: #ffffff; --paper-red: #c23a24; --ink: #1d2a30; --line-strong: #c9c1ae;
+  position: relative; width: var(--d); aspect-ratio: 1; border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 0 0 clamp(6px, 1.1cqmin, 16px) var(--card), var(--shadow-lift);
+}
+/* 剩餘時間是一塊番茄紅扇形，像時鐘指針一樣往 12 點收 */
+.dial-face {
+  appearance: none; display: block; width: 100%; height: 100%; border: 0; border-radius: 50%;
+  background: conic-gradient(transparent calc((1 - var(--value)) * 1turn), var(--wedge, var(--paper-red)) 0);
+  transition: --value 0s linear;
+}
+@media (prefers-reduced-motion: no-preference) { .dial-face { transition-duration: 0.25s; } }
+.dial-face::-webkit-progress-bar, .dial-face::-webkit-progress-value { background: none; display: none; }
+.dial-face::-moz-progress-bar { background: none; }
+@media (forced-colors: active) {
+  .dial-face { forced-color-adjust: none; background: conic-gradient(Canvas calc((1 - var(--value)) * 1turn), CanvasText 0); }
+}
+/* 外圈 12 道刻度（SVG 線條，任何尺寸都清楚）與中心一枚圖釘 */
+.dial-ticks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; color: color-mix(in srgb, var(--ink) 60%, transparent); }
+.dial::before {
+  content: ""; position: absolute; z-index: 1; inset: 46%; border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, rgb(255 255 255 / 0.6) 0 18%, transparent 22%), var(--felt);
+  box-shadow: var(--shadow-pin);
+}
+.stage-readout { display: grid; justify-items: center; gap: 1.5cqh; }
+.stage-time, .stage-done {
+  font-family: var(--display); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
+  font-size: min(13cqw, 28cqh); color: var(--felt-ink); white-space: nowrap;
+}
+.stage-time.long { font-size: min(9cqw, 22cqh); }
+.stage-done { color: var(--paper-sun); }
+.stage-tag {
+  padding: 2px 14px; border: 3px dashed var(--paper-sun); border-radius: var(--r-tag);
+  font-weight: 700; font-size: clamp(1rem, min(2.6cqw, 4cqh), 2rem);
+}
+.stage.paused .stage-time { color: var(--felt-muted); }
+.stage.done .dial-face { background: none; }
+.stage.idle .dial-face { --wedge: color-mix(in srgb, var(--line-strong) 45%, var(--card)); }
+/* 時間到：虛線框加「時間到」字樣，不只靠顏色 */
+.stage.done { outline: 4px dashed var(--paper-sun); outline-offset: -12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .stage.done .stage-done { animation: done-pin 0.55s var(--ease-out) both; }
+}
+@keyframes done-pin {
+  0% { transform: translateY(-0.3em) scale(1.12); opacity: 0; }
+  60% { transform: translateY(0.03em) scale(0.98); opacity: 1; }
+  100% { transform: none; }
+}
+@container stage (aspect-ratio < 1.15) {
+  .stage-body { grid-auto-flow: row; }
+  .dial { --d: min(50cqh, 74cqw); }
+  .stage-time, .stage-done { font-size: min(19cqw, 14cqh); }
+  .stage-time.long { font-size: min(14cqw, 11cqh); }
+}
+.stage-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.stage-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.stage-group:empty { display: none; }
+@container stage (width < 32rem) {
+  .stage-bar { justify-content: center; }
+  .stage .btn { padding-inline: 12px; }
+}
+.stage .btn { background: transparent; border-color: rgb(255 255 255 / 0.42); color: var(--felt-ink); }
+.stage .btn:hover { background: rgb(255 255 255 / 0.12); }
+.stage .btn.stage-main { background: var(--paper-sun); border-color: var(--paper-sun); color: var(--on-sun); }
+.stage .btn.stage-main:hover { background: color-mix(in srgb, var(--paper-sun) 88%, white); }
+/* 靜音按下：絨布深處底、實線白框，主要靠斜線鈴鐺表達，不比主按鈕搶眼 */
+.stage .btn[aria-pressed="true"] { background: var(--felt-deep); border-color: var(--felt-ink); }

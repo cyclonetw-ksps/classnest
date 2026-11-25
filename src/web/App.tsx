@@ -6,6 +6,7 @@ import { Login } from "./Login";
 import { PointsPanel } from "./PointsPanel";
 import { ReasonsPanel, RewardsPanel } from "./RewardsPanel";
 import { GroupsPanel, StudentsPanel } from "./RosterPanel";
+import { ScreenPanel } from "./ScreenPanel";
 import { SettingsPanel } from "./SettingsPanel";
 
 export type Act = (fn: () => Promise<unknown>, done?: string) => Promise<boolean>;
@@ -13,6 +14,7 @@ export type Act = (fn: () => Promise<unknown>, done?: string) => Promise<boolean
 const TABS = [
   { id: "points", label: "加分" },
   { id: "board", label: "公布欄" },
+  { id: "screen", label: "大螢幕" },
   { id: "students", label: "學生" },
   { id: "groups", label: "組別" },
   { id: "reasons", label: "加分理由" },
@@ -127,6 +129,8 @@ export function App() {
       <main class="sheet">
         {tab === "points" && <PointsPanel state={state} act={act} />}
         {tab === "board" && <BoardPanel state={state} act={act} />}
+        {/* 大螢幕一直掛著，切到其他分頁時計時與提示音照常 */}
+        <ScreenPanel hidden={tab !== "screen"} />
         {tab === "students" && <StudentsPanel state={state} act={act} />}
         {tab === "groups" && <GroupsPanel state={state} act={act} />}
         {tab === "reasons" && <ReasonsPanel state={state} act={act} />}
