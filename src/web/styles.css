@@ -632,3 +632,104 @@ input.has-error { border-color: var(--danger); background: var(--danger-soft); }
 .stage .btn.stage-main:hover { background: color-mix(in srgb, var(--paper-sun) 88%, white); }
 /* 靜音按下：絨布深處底、實線白框，主要靠斜線鈴鐺表達，不比主按鈕搶眼 */
 .stage .btn[aria-pressed="true"] { background: var(--felt-deep); border-color: var(--felt-ink); }
+
+/* ---------- 課表：節次、固定課表、每週計畫 ---------- */
+.schedule-body { display: grid; gap: 16px; min-width: 0; }
+.schedule .section-head .segmented { flex: 0 1 30rem; }
+.period-form { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+.period-form .field { margin: 0; }
+.period-form .field:first-child { grid-column: 1 / -1; }
+.period-form .btn { grid-column: 1 / -1; justify-self: start; }
+@media (min-width: 700px) {
+  .period-form { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .period-form .field:first-child, .period-form .btn { grid-column: auto; }
+}
+.field-pair { display: grid; gap: 0 12px; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+
+.week-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.week-nav { display: grid; grid-template-columns: auto auto auto; gap: 8px; align-items: center; }
+.sheet h3.week-range { margin: 0 6px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 699px) { .week-nav { width: 100%; grid-template-columns: auto 1fr auto; } }
+/* 藥丸式切換：radio 的圓點藏起來，選中的整顆填色；仍是 radio，可用鍵盤 */
+.segmented.pills label { position: relative; gap: 0; padding-inline: 12px; white-space: nowrap; }
+.segmented.pills input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+.segmented.pills label:has(:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* 一張課表：寬的時候是表格（欄是星期、列是節次），窄的時候選一天列出各節 */
+.tt { container-type: inline-size; min-width: 0; }
+.tt-narrow { display: none; gap: 12px; }
+@container (width < 44rem) {
+  .tt-wide { display: none; }
+  .tt-narrow { display: grid; }
+}
+.tt-wide:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: var(--r); }
+.tt-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 8px; margin: -8px; width: calc(100% + 16px); }
+.tt-table thead td { width: 6.6rem; }
+.tt-table thead th { text-align: left; font-weight: 700; padding: 0 4px 2px; border-bottom: 2px solid var(--line); }
+.tt-table thead th.is-today { border-bottom-color: var(--paper-sun); }
+.tt-table tbody th { text-align: left; vertical-align: top; padding: 10px 4px 0 0; font-weight: 400; }
+.tt-table td { vertical-align: top; padding: 0; height: 1px; }
+.tt-table td.is-today { background: color-mix(in srgb, var(--paper-sun) 9%, transparent); border-radius: var(--r-label); }
+/* 深色：暗下來的黃一定變土黃，今天那一欄改成稍微提亮的卡片色，靠黃底線與「今天」小標辨認 */
+@media (prefers-color-scheme: dark) { .tt-table td.is-today { background: color-mix(in srgb, var(--card) 70%, transparent); } }
+.tt-period { display: block; font-weight: 700; }
+.tt-time { display: block; color: var(--muted); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.tt-date { margin-left: 6px; color: var(--muted); font-weight: 400; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.tt-today {
+  margin-left: 6px; padding: 0 6px; border: 2px dashed var(--paper-sun); border-radius: var(--r-tag);
+  font-size: var(--fs-tag); font-weight: 700; white-space: nowrap;
+}
+.sheet h3.tt-day-title { margin: 4px 0 0; }
+.tt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.tt-list li { display: grid; gap: 6px; }
+.tt-list-head { display: flex; gap: 10px; align-items: baseline; }
+.tt-list-head .tt-time { display: inline; }
+
+/* 一節課：小紙卡，頂端是組別色紙的波浪滾邊（沒有組別是紙邊色） */
+.lesson {
+  --paper: var(--line-strong);
+  position: relative; display: grid; align-content: start; gap: 3px; width: 100%; height: 100%; min-height: 4.4rem;
+  padding: 16px 10px 10px; border: 0; border-radius: 4px 4px 10px 10px; text-align: left; cursor: pointer;
+  background: var(--card); color: var(--ink); box-shadow: var(--shadow); min-width: 0;
+}
+@media (prefers-reduced-motion: no-preference) { .lesson { transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out); } }
+.lesson::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 10px; border-radius: 4px 4px 0 0; background: var(--paper);
+  mask: radial-gradient(circle at 6px 10px, transparent 4.5px, var(--mask-ink) 5px) 0 0 / 12px 10px repeat-x;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .lesson:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+}
+@media (hover: hover) { .lesson:hover { box-shadow: var(--shadow-lift); } }
+.tt-list .lesson { min-height: 3.4rem; padding-inline: 14px; }
+.lesson-subject { font-weight: 700; font-size: 1.05rem; line-height: 1.35; overflow-wrap: anywhere; }
+.lesson-group { font-size: var(--fs-small); color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
+.lesson-line {
+  font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lesson-content { -webkit-line-clamp: 3; }
+.lesson-hw .due { margin-right: 2px; }
+.lesson-empty { display: grid; place-items: center; height: 100%; min-height: 2rem; color: var(--muted); }
+.lesson-empty svg { width: 16px; height: 16px; }
+.lesson.blank:hover .lesson-empty { color: var(--ink); }
+.lesson.blank { background: transparent; box-shadow: none; outline: 1.5px dashed var(--line); outline-offset: -1.5px; }
+.lesson.blank::before { display: none; }
+.lesson.blank:hover { background: var(--card); }
+/* 停課：實心番茄紅「停課」＋刪除線；換課：實線框＋交換圖示；作業：紅虛線；今天：黃虛線。形狀各不同，不只靠顏色 */
+.lesson.cancelled { background: color-mix(in srgb, var(--card) 55%, var(--sheet)); box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -1.5px; }
+.lesson.cancelled::before { opacity: 0.4; }
+.lesson.cancelled .lesson-subject, .lesson.cancelled .lesson-group { text-decoration: line-through 2px; color: var(--muted); }
+.lesson-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag {
+  display: inline-flex; gap: 3px; align-items: center;
+  padding: 0 6px; border-radius: var(--r-tag); border: 2px solid; font-size: var(--fs-tag); font-weight: 700;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tag svg { width: 14px; height: 14px; flex: none; }
+.tag-cancel { background: var(--paper-red); border-color: var(--paper-red); color: var(--on-red); }
+.tag-change { border-color: var(--ink); color: var(--ink); }
+/* 對話框內容長時，儲存鈕固定在對話框底部 */
+.sticky-actions { position: sticky; bottom: -24px; margin: 4px -22px -24px; padding: 12px 22px 16px; background: var(--sheet); border-top: 1px solid var(--line); }
+.lesson-base { color: var(--muted); font-size: var(--fs-small); margin-bottom: 8px; }
+.lesson-adjust { border-top: 1px dashed var(--line-strong); padding-top: 12px; }

@@ -99,6 +99,51 @@ export interface AgentKey {
   lastUsedAt: number | null;
 }
 
+// 課表：一節的時間
+export interface Period {
+  id: string;
+  label: string;
+  start: string; // HH:MM
+  end: string;
+}
+
+// 固定週課表的一格（週一到週五 × 節次）
+export interface Slot {
+  weekday: number;
+  periodId: string;
+  groupId: string | null;
+  subject: string;
+  bring: string;
+}
+
+// 某一週某一天某一節：已經把固定課表、換課、停課合在一起
+export interface Lesson {
+  weekday: number;
+  date: string;
+  periodId: string;
+  groupId: string | null;
+  subject: string;
+  // 固定課表原本的樣子；沒有排課是 null
+  base: { groupId: string | null; subject: string; bring: string } | null;
+  changed: boolean;
+  cancelled: boolean;
+  note: string;
+  content: string;
+  homework: string;
+  // 這週要帶的東西（ownBring）有填就用它，沒填用固定課表的預設
+  bring: string;
+  ownBring: string;
+  updatedBy: string;
+  updatedAt: number | null;
+}
+
+export interface WeekView {
+  weekStart: string;
+  days: { weekday: number; date: string }[];
+  periods: Period[];
+  lessons: Lesson[];
+}
+
 export interface ClassState {
   me: { email: string; name: string };
   title: string;
@@ -111,6 +156,8 @@ export interface ClassState {
   boards: Board[];
   share: ShareInfo;
   agentKeys: AgentKey[];
+  periods: Period[];
+  slots: Slot[];
 }
 
 // 分享頁看到的內容：只有分享的面板與組別名稱，沒有任何學生資料，也不顯示是誰貼的
@@ -148,6 +195,13 @@ export const LIMITS = {
   url: 2000,
   agentKeys: 20,
   keyName: 30,
+  periods: 12,
+  periodLabel: 10,
+  subject: 20,
+  bring: 60,
+  lessonContent: 500,
+  homework: 300,
+  lessonNote: 40,
   // 通關碼連續答錯幾次後暫停一段時間
   pinAttempts: 10,
   pinLockMs: 10 * 60 * 1000,

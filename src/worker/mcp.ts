@@ -1,6 +1,6 @@
 // agent 入口（MCP，Streamable HTTP，不開串流）：每個 JSON-RPC 請求一個 POST，回 application/json。
 // 金鑰用 Authorization: Bearer 帶；金鑰驗證與每個工具的權限都在 Durable Object 裡（ClassroomDO.agentTool）。
-// 工具只有組別名稱、面板與卡片；學生、分數、獎勵、老師、設定都不在這裡。
+// 工具只有組別名稱、面板與卡片、課表（讀節次與某一週、寫每週內容）；學生、分數、獎勵、老師、設定都不在這裡。
 import { LIMITS } from "../shared/types";
 
 export interface AgentPort {
@@ -16,7 +16,9 @@ const instructions = (origin: string) => `班級布告欄（${origin}）：老�
 - 面板可以標組別（groupIds，空白代表全班），可以設成分享（shared: true）讓代課老師、學生、家長從分享連結看到。
 - 卡片有三種：text（文字）、link（連結，一定要有 url）、homework（回家作業，url 與 dueDate 可空白，dueDate 格式 YYYY-MM-DD）。
 - 連結與作業卡在網頁上可以放大成 QR Code，所以網址請給學生能直接打開的那一個。
-- 先用 list_groups 查組別代號，再建立面板或卡片。這個入口看不到也改不了學生、分數、獎勵與設定。`;
+- 先用 list_groups 查組別代號，再建立面板或卡片。
+- 課表：get_timetable 查節次（代號與時間）和固定週課表（週一到週五每節哪組上什麼科）；get_week 看某一週（weekStart 是那週週一的 YYYY-MM-DD）；set_week_plan 一次填好整週各節的教學內容、作業與要帶的東西。換課、停課、改節次與固定課表只有老師能在網頁上做。
+- 這個入口看不到也改不了學生、分數、獎勵與設定。`;
 
 const id = { type: "string", description: "代號" };
 const boardProps = {
@@ -33,6 +35,8 @@ const cardProps = {
   dueDate: { type: ["string", "null"], description: "作業繳交日期 YYYY-MM-DD，可空白" },
   position: { type: "integer", description: "在面板裡排第幾張（0 是最上面）" },
 };
+
+const weekStart = { type: "string", description: "那一週週一的日期 YYYY-MM-DD" };
 
 const TOOLS = [
   { name: "list_groups", title: "列出組別", description: "列出目前使用中的組別（代號與名稱）。", inputSchema: { type: "object", properties: {} } },
@@ -72,6 +76,44 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { id, ...cardProps }, required: ["id"] },
   },
   { name: "delete_card", title: "刪除卡片", description: "刪除一張卡片，無法復原。", inputSchema: { type: "object", properties: { id }, required: ["id"] } },
+  {
+    name: "get_timetable",
+    title: "查課表",
+    description: "列出節次（代號、名稱、開始與結束時刻）、固定週課表（weekday 1 是週一到 5 是週五，每格的組別代號、科目、預設要帶的東西）與組別名稱。",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_week",
+    title: "看某一週",
+    description: "列出某一週週一到週五每一節：組別、科目（已套用換課）、是否停課、教學內容、作業、要帶的東西。",
+    inputSchema: { type: "object", properties: { weekStart }, required: ["weekStart"] },
+  },
+  {
+    name: "set_week_plan",
+    title: "填整週計畫",
+    description: `一次寫入某一週多個節次的教學內容、作業與要帶的東西；沒給的欄位不變，給空字串代表清掉。全部檢查過才寫入，有一格錯就整批不寫。每格內容最多 ${LIMITS.lessonContent} 字、作業 ${LIMITS.homework} 字、要帶的東西 ${LIMITS.bring} 字。`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        weekStart,
+        lessons: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              weekday: { type: "integer", minimum: 1, maximum: 5, description: "1 是週一，5 是週五" },
+              periodId: { type: "string", description: "節次代號（get_timetable 查）" },
+              content: { type: "string", description: "教學內容" },
+              homework: { type: "string", description: "作業" },
+              bring: { type: "string", description: "這週這節要帶的東西；空字串代表用固定課表的預設" },
+            },
+            required: ["weekday", "periodId"],
+          },
+        },
+      },
+      required: ["weekStart", "lessons"],
+    },
+  },
 ];
 
 type Id = string | number | null;
