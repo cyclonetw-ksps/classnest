@@ -37,6 +37,25 @@ describe("Google 公開金鑰（JWKS）", () => {
     expect(jwksFetches).toBe(1);
   });
 
+  it("Google 換了金鑰：60 秒內不重抓，滿 60 秒後遇到新 kid 重抓一次", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      expect(await verifyGoogleIdToken(await googleToken("r@school.test"), CLIENT)).not.toBeNull();
+      expect(jwksFetches).toBe(1);
+      vi.setSystemTime(Date.now() + 59_000);
+      expect(await verifyGoogleIdToken(await googleToken("r@school.test", {}, { kid: "rotated" }), CLIENT)).toBeNull();
+      expect(jwksFetches).toBe(1);
+      vi.setSystemTime(Date.now() + 2_000);
+      expect(await verifyGoogleIdToken(await googleToken("r@school.test", {}, { kid: "rotated" }), CLIENT)).toBeNull();
+      expect(jwksFetches).toBe(2);
+      // 剛重抓過：馬上再來一個陌生 kid 不會再抓
+      expect(await verifyGoogleIdToken(await googleToken("r@school.test", {}, { kid: "rotated-2" }), CLIENT)).toBeNull();
+      expect(jwksFetches).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("快取是空的時候，第一次遇到陌生 kid 照常抓一次", async () => {
     expect(await verifyGoogleIdToken(await googleToken("b@school.test", {}, { kid: "random" }), CLIENT)).toBeNull();
     expect(jwksFetches).toBe(1);
