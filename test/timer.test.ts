@@ -39,9 +39,11 @@ describe("計時狀態", () => {
     expect(runView(late, T0 + MIN + 100).done).toBe(true);
   });
 
-  it("繼續與重來只對該狀態有作用", () => {
+  it("正在跑的計時按繼續不會改變；重來後清掉暫停", () => {
     const run = startRun("minutes", "x", MIN, T0);
     expect(resumeRun(run, T0 + 10)).toBe(run);
+    const paused = pauseRun(run, T0 + 10_000);
+    expect(restartRun(paused, T0 + 20_000)).toEqual({ ...run, endAt: T0 + 20_000 + MIN, paused: null });
   });
 });
 

@@ -7,7 +7,7 @@ export function unlockChime() {
   try {
     ctx ??= new AudioContext();
     // Safari 鎖屏或切 App 回來可能是 "interrupted"，不是 running 就重新啟動
-    if (ctx.state !== "running") void ctx.resume();
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
   } catch {
     ctx = null;
   }
