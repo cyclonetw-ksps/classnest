@@ -733,3 +733,44 @@ input.has-error { border-color: var(--danger); background: var(--danger-soft); }
 .sticky-actions { position: sticky; bottom: -24px; margin: 4px -22px -24px; padding: 12px 22px 16px; background: var(--sheet); border-top: 1px solid var(--line); }
 .lesson-base { color: var(--muted); font-size: var(--fs-small); margin-bottom: 8px; }
 .lesson-adjust { border-top: 1px dashed var(--line-strong); padding-top: 12px; }
+
+/* ---------- 大螢幕：依課表 ---------- */
+.stage-lesson { display: grid; justify-items: center; gap: 1.2cqh; text-align: center; }
+.stage-lesson-what {
+  display: inline-flex; flex-wrap: wrap; gap: 0 0.5em; align-items: baseline; justify-content: center;
+  font-family: var(--display); color: var(--felt-ink); line-height: 1.2; font-size: clamp(1.3rem, min(4.4cqw, 7cqh), 5rem);
+}
+.stage-lesson-what::before {
+  content: ""; align-self: center; width: 0.7em; height: 0.7em; border-radius: var(--r-tiny);
+  background: var(--paper, var(--felt-muted)); box-shadow: var(--shadow-swatch);
+}
+.stage-lesson-what.no-group::before { display: none; }
+.stage-lesson-next { font-family: var(--text); font-weight: 700; font-size: max(0.55em, 0.875rem); color: var(--felt-muted); }
+/* 換節時課程那一塊用和圖釘同一條曲線落下；減少動態效果時直接出現 */
+@media (prefers-reduced-motion: no-preference) {
+  .stage-lesson { animation: done-pin 0.55s var(--ease-out) both; }
+}
+/* 中文斷行只在子句之間：每個子句不拆開 */
+.phrases span { display: inline-block; }
+.stage-lesson-bring {
+  padding: 0.15em 0.7em; border-radius: var(--r-tag); background: var(--paper-sun); color: var(--on-sun);
+  font-weight: 700; font-size: clamp(1.1rem, min(3.2cqw, 5cqh), 3.2rem); line-height: 1.3; overflow-wrap: anywhere;
+}
+.stage-cancel { border-style: solid; background: var(--paper-red); border-color: var(--paper-red); color: var(--on-red); }
+.stage-note { color: var(--felt-muted); font-size: clamp(1rem, min(2.4cqw, 3.6cqh), 1.8rem); text-align: center; max-width: 32ch; }
+.stage.bell .stage-readout { max-width: 100%; }
+/* 依課表多一行課程與要帶的東西，鐘面讓出一點高度 */
+.stage.bell .dial { --d: min(56cqh, 38cqw); }
+@container stage (aspect-ratio < 1.15) {
+  .stage.bell .dial { --d: min(40cqh, 70cqw); }
+  .stage.bell .stage-time { font-size: min(19cqw, 12cqh); }
+}
+.screen .setup-block a { color: var(--accent); font-weight: 700; text-underline-offset: 3px; }
+/* 啟用中：一行狀態文字，前面一枚圖釘，不做成框（免得像輸入欄） */
+/* 狀態行放在按鈕原位、同高，按下後版面不位移（免得下一下點到「計時」） */
+.bell-on { display: flex; gap: 8px; align-items: center; min-block-size: 44px; margin-top: 4px; font-weight: 700; }
+.bell-on::before {
+  content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, rgb(255 255 255 / 0.65) 0 2px, transparent 2.5px), var(--paper-sun);
+  box-shadow: var(--shadow-pin);
+}
