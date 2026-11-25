@@ -12,7 +12,7 @@ export function AgentKeys({ state, act }: { state: ClassState; act: Act }) {
   const [name, setName] = useState("");
   const [fresh, setFresh] = useState<{ name: string; key: string } | null>(null);
   const endpoint = `${location.origin}/api/mcp`;
-  const command = fresh ? `claude mcp add --transport http classnest ${endpoint} --header "Authorization: Bearer ${fresh.key}"` : "";
+  const command = fresh ? `claude mcp add --scope user --transport http classnest ${endpoint} --header "Authorization: Bearer ${fresh.key}"` : "";
 
   return (
     <>
@@ -92,12 +92,22 @@ export function AgentKeys({ state, act }: { state: ClassState; act: Act }) {
             </div>
             <div class="field">
               <span class="field-label">Claude Code 一行設定</span>
-              <code class="secret">{command}</code>
+              <code class="secret">
+                {command.split(" ").map((part, i) => (
+                  <>
+                    {i > 0 && " "}
+                    {/* 參數名稱（--scope、--header）不要從連字號中間斷行 */}
+                    {part.startsWith("--") ? <span class="nobr">{part}</span> : part}
+                  </>
+                ))}
+              </code>
               <CopyButton text={command} label="複製設定指令">
                 複製指令
               </CopyButton>
             </div>
-            <p class="hint">其他 agent：MCP 種類選 Streamable HTTP，標頭加上 Authorization: Bearer 金鑰。</p>
+            <p class="hint">
+              這行指令在終端機執行一次，之後每個資料夾開的 Claude Code 都能用。其他 agent：MCP 種類選 Streamable HTTP，標頭加上 Authorization: Bearer 金鑰。
+            </p>
           </div>
         )}
       </Dialog>

@@ -429,13 +429,14 @@ export class BoardStore {
     return ok({ id });
   }
 
-  async agentAuth(key: string): Promise<AgentIdentity | null> {
+  // touch：記下最後使用時間。MCP 每個請求先驗一次（記時間），工具執行前再驗一次（不記），停用立即失效
+  async agentAuth(key: string, touch = true): Promise<AgentIdentity | null> {
     if (!key) return null;
     const row = this.sql
       .exec<{ id: string; name: string }>("SELECT id, name FROM agent_keys WHERE hash = ? AND active = 1", await sha256Hex(key))
       .toArray()[0];
     if (!row) return null;
-    this.sql.exec("UPDATE agent_keys SET last_used_at = ? WHERE id = ?", Date.now(), row.id);
+    if (touch) this.sql.exec("UPDATE agent_keys SET last_used_at = ? WHERE id = ?", Date.now(), row.id);
     return { id: row.id, name: row.name };
   }
 
