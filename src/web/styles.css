@@ -540,6 +540,7 @@ code.secret {
 .screen input[type="number"]::-webkit-inner-spin-button, .screen input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .field-error { color: var(--danger); font-size: 0.9rem; font-weight: 600; }
 .field-error:empty { display: none; }
+.screen .inline-form .error-msg, .screen .inline-form .field-error { flex-basis: 100%; }
 input.has-error { border-color: var(--danger); background: var(--danger-soft); }
 
 /* 舞台是一塊絨布，上面釘一個紙做的鐘面；深淺色模式都一樣是絨布，投影時對比最穩 */

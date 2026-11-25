@@ -1,19 +1,12 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { atClock, formatClock, formatRemaining, parseClock, parseMinutes, remainingFraction, remainingMs, TIMER_MAX_MINUTES } from "../shared/clock";
+import { atClock, formatClock, formatRemaining, parseClock, parseMinutes, TIMER_MAX_MINUTES } from "../shared/clock";
+import { chimeDue, pauseRun, restartRun, resumeRun, runView, startRun, type Run } from "../shared/timer";
 import { playChime, readMuted, unlockChime, writeMuted } from "./chime";
 import { Bell, BellOff, Expand, Pause, Play, Restart, Shrink, Stop } from "./icons";
 
 // 大螢幕：投影用的計時畫面。只有計時，不放任何學生資料或分數。
 // 計時以結束時刻為準（endAt），每次重畫都用裝置時鐘重新算，背景分頁回來也不會飄。
-
-interface Run {
-  kind: "minutes" | "until";
-  label: string;
-  total: number;
-  endAt: number;
-  // 暫停時記下剩餘毫秒；null 代表正在跑
-  paused: number | null;
-}
+// 狀態轉移（暫停、繼續、重來、何時響）在 src/shared/timer.ts，有測試。
 
 const PRESETS = [1, 3, 5, 10, 15, 20, 30];
 const TICKS = Array.from({ length: 12 }, (_, i) => i * 30);
@@ -25,8 +18,9 @@ function reducedMotion() {
 export function ScreenPanel({ hidden }: { hidden: boolean }) {
   const [run, setRun] = useState<Run | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [muted, setMuted] = useState(readMuted);
+  const [muted, setMuted] = useState(() => readMuted());
   const [minutes, setMinutes] = useState("");
+  const [minutesError, setMinutesError] = useState("");
   const [untilName, setUntilName] = useState("");
   const [untilAt, setUntilAt] = useState("");
   const [untilError, setUntilError] = useState("");
@@ -37,10 +31,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
-  const running = !!run && run.paused === null;
-  const remaining = run ? (run.paused ?? remainingMs(run.endAt, now)) : 0;
-  const done = running && remaining === 0;
-  const frac = run ? remainingFraction(remaining, run.total) : 1;
+  const { remaining, done, running, frac } = runView(run, now);
   const canFull = typeof document !== "undefined" && !!document.fullscreenEnabled;
 
   // 跑的時候每 250 毫秒重畫一次；切回這個分頁時立刻補算
@@ -57,11 +48,11 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
 
   // 時間到：同一次計時只響一次
   useEffect(() => {
-    if (!done || !run || chimedFor.current === run.endAt) return;
+    if (!run || !chimeDue(run, now, chimedFor.current)) return;
     chimedFor.current = run.endAt;
     setAnnounce("時間到");
     if (!mutedRef.current) playChime();
-  }, [done, run]);
+  }, [done, run, now]);
 
   // 計時中（含時間到的畫面）盡量不讓螢幕熄滅；瀏覽器不支援就算了
   useEffect(() => {
@@ -103,8 +94,8 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
   }
 
   function startMinutes(m: number) {
-    const total = m * 60_000;
-    begin({ kind: "minutes", label: `計時 ${m} 分鐘`, total, endAt: Date.now() + total, paused: null }, `開始計時 ${m} 分鐘`);
+    setMinutesError("");
+    begin(startRun("minutes", `計時 ${m} 分鐘`, m * 60_000, Date.now()), `開始計時 ${m} 分鐘`);
   }
 
   function startUntil() {
@@ -121,28 +112,35 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
     }
     setUntilError("");
     const name = untilName.trim() || "倒數到";
-    begin({ kind: "until", label: `${name} ${formatClock(time)}`, total: endAt - t, endAt, paused: null }, `開始倒數到 ${formatClock(time)}`);
+    begin(startRun("until", `${name} ${formatClock(time)}`, endAt - t, t), `開始倒數到 ${formatClock(time)}`);
   }
 
   function pause() {
-    if (!run || run.paused !== null) return;
-    setRun({ ...run, paused: remainingMs(run.endAt, Date.now()) });
+    if (!run) return;
+    const t = Date.now();
+    const next = pauseRun(run, t);
+    setNow(t);
+    if (next === run) return; // 時間剛好到了：照常進入「時間到」
+    setRun(next);
     setAnnounce("已暫停");
   }
 
+  // 繼續與重來也是使用者按的，順便重新解鎖音訊（iPad 鎖屏回來後可能被暫停）
   function resume() {
-    if (!run || run.paused === null) return;
+    if (!run) return;
+    unlockChime();
     const t = Date.now();
     setNow(t);
-    setRun({ ...run, endAt: t + run.paused, paused: null });
+    setRun(resumeRun(run, t));
     setAnnounce("繼續計時");
   }
 
   function restart() {
     if (!run) return;
+    unlockChime();
     const t = Date.now();
     setNow(t);
-    setRun({ ...run, endAt: t + run.total, paused: null });
+    setRun(restartRun(run, t));
     setAnnounce("重新開始");
   }
 
@@ -184,6 +182,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
               e.preventDefault();
               const m = parseMinutes(minutes);
               if (m) startMinutes(m);
+              else setMinutesError(`請輸入 1 到 ${TIMER_MAX_MINUTES} 的整數，例如 15。`);
             }}
           >
             <h3>計時</h3>
@@ -199,7 +198,6 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
               <div class="inline-form">
                 <input
                   id="sc-min"
-                  class="num"
                   type="number"
                   inputMode="numeric"
                   min={1}
@@ -207,8 +205,12 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
                   step={1}
                   required
                   value={minutes}
-                  onInput={(e) => setMinutes(e.currentTarget.value)}
+                  onInput={(e) => {
+                    setMinutes(e.currentTarget.value);
+                    setMinutesError("");
+                  }}
                   data-error="sc-min-err"
+                  class={`num ${minutesError ? "has-error" : ""}`}
                 />
                 <span class="unit-label">分鐘</span>
                 <button class="btn primary" type="submit">
@@ -216,6 +218,9 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
                 </button>
                 <span class="error-msg" id="sc-min-err">
                   請輸入 1 到 {TIMER_MAX_MINUTES} 的整數。
+                </span>
+                <span class="field-error" role="alert">
+                  {minutesError}
                 </span>
               </div>
             </div>
@@ -269,7 +274,7 @@ export function ScreenPanel({ hidden }: { hidden: boolean }) {
                   max={1}
                   value={frac}
                   aria-label="剩餘時間"
-                  aria-valuetext={done ? "時間到" : `剩 ${time}`}
+                  aria-valuetext={!run ? "尚未開始" : done ? "時間到" : `剩 ${time}`}
                   style={{ "--value": String(frac) }}
                 />
                 <svg class="dial-ticks" viewBox="0 0 100 100" aria-hidden="true">

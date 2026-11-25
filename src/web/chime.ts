@@ -6,7 +6,8 @@ let ctx: AudioContext | null = null;
 export function unlockChime() {
   try {
     ctx ??= new AudioContext();
-    if (ctx.state === "suspended") void ctx.resume();
+    // Safari 鎖屏或切 App 回來可能是 "interrupted"，不是 running 就重新啟動
+    if (ctx.state !== "running") void ctx.resume();
   } catch {
     ctx = null;
   }
@@ -35,19 +36,29 @@ export function playChime() {
 
 const MUTE_KEY = "classnest:screen-muted";
 
-// 靜音記在這台裝置；瀏覽器擋住儲存空間時當作沒靜音
-export function readMuted(): boolean {
+type MuteStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+function deviceStorage(): MuteStorage | undefined {
   try {
-    return localStorage.getItem(MUTE_KEY) === "1";
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+// 靜音記在這台裝置；瀏覽器擋住儲存空間時當作沒靜音
+export function readMuted(storage: MuteStorage | undefined = deviceStorage()): boolean {
+  try {
+    return storage?.getItem(MUTE_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-export function writeMuted(muted: boolean) {
+export function writeMuted(muted: boolean, storage: MuteStorage | undefined = deviceStorage()) {
   try {
-    if (muted) localStorage.setItem(MUTE_KEY, "1");
-    else localStorage.removeItem(MUTE_KEY);
+    if (muted) storage?.setItem(MUTE_KEY, "1");
+    else storage?.removeItem(MUTE_KEY);
   } catch {
     // 存不了就只在這次有效
   }
