@@ -1002,7 +1002,12 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 .slip-name b { font-size: 1.25rem; }
 @media print {
   /* 列印一律用淺色紙面的顏色，而且保留背景色（圖卡順序的 1、2、3 與組別色帶靠背景色） */
-  :root { --ink: #1d2a30; --muted: #56666c; --line-strong: #c9c1ae; --sheet: #ffffff; --card: #ffffff; --felt: #1f4e5f; }
+  :root {
+    --ink: #1d2a30; --muted: #56666c; --line-strong: #c9c1ae; --sheet: #ffffff; --card: #ffffff; --felt: #1f4e5f;
+    /* 組別色也固定成淺色那一套：同一組不論在哪個模式印，顏色都一樣 */
+    --paper-red: #c23a24; --paper-sky: #2a6fae; --paper-sun: #f0b323; --paper-grass: #2e7634;
+    --paper-grape: #7a56b0; --paper-orange: #e0761e; --paper-peach: #ab3c6f; --paper-teal: #167570;
+  }
   .print-page, .print-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { background: #ffffff !important; }
   .print-page { padding: 0; background: #ffffff; color: #1d2a30; min-height: 0; }
