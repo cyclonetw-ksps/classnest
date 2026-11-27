@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { PublicDiary, PublicView } from "../shared/types";
-import { weekdayOf, WEEKDAY_NAMES } from "../shared/week";
+import { localDate, weekdayOf, WEEKDAY_NAMES } from "../shared/week";
 import { ApiError, getConfig, request } from "./api";
 import { DiaryLines } from "./diary-lines";
 import { boardPaper, Note } from "./notes";
@@ -159,11 +159,19 @@ export function PublicPage({ code }: { code: string }) {
         {view.boards.length === 0 ? (
           view.diary.length === 0 && <p class="empty">老師還沒有分享內容{group ? "給這一組" : ""}。</p>
         ) : (
+          <section class="pub-boards" aria-labelledby={view.diary.length > 0 ? "pub-boards-title" : undefined}>
+          {view.diary.length > 0 && (
+            <h2 id="pub-boards-title" class="pub-section-title">
+              公布欄
+            </h2>
+          )}
           <ol class="boards">
-            {view.boards.map((b) => (
+            {view.boards.map((b) => {
+              const Title = view.diary.length > 0 ? "h3" : "h2";
+              return (
               <li key={b.id} class="board-col" style={{ "--paper": boardPaper(b.groupIds, colorOf).hue }}>
                 <header class="board-strip">
-                  <h2>{b.title}</h2>
+                  <Title>{b.title}</Title>
                   <p class="board-meta">
                     <span class="board-groups">{b.groupIds.length ? b.groupIds.map(groupName).filter(Boolean).join("、") : "全班"}</span>
                   </p>
@@ -174,14 +182,16 @@ export function PublicPage({ code }: { code: string }) {
                   <ol class="notes">
                     {b.cards.map((c) => (
                       <li key={c.id}>
-                        <Note card={c} level={3} />
+                        <Note card={c} level={view.diary.length > 0 ? 4 : 3} />
                       </li>
                     ))}
                   </ol>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ol>
+          </section>
         )}
       </main>
     </div>
@@ -191,13 +201,17 @@ export function PublicPage({ code }: { code: string }) {
 // 聯絡簿：一天一段（新的在前），每組一張紙；沒有個別加註，也沒有是誰寫的
 function PublicDiaryList(props: { diary: PublicDiary[]; colorOf: (id: string) => number; groupName: (id: string) => string }) {
   const dates = [...new Set(props.diary.map((d) => d.date))];
+  const today = localDate(new Date());
   return (
     <section class="pub-diary" aria-labelledby="pub-diary-title">
-      <h2 id="pub-diary-title">聯絡簿</h2>
+      <h2 id="pub-diary-title" class="pub-section-title">
+        聯絡簿
+      </h2>
       {dates.map((date) => (
         <div key={date} class="pub-diary-day">
-          <h3>
+          <h3 class="pub-diary-date">
             {WEEKDAY_NAMES[weekdayOf(date)] ?? ""} {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}
+            {date === today && <span class="tt-today">今天</span>}
           </h3>
           <ol class="diary-list">
             {props.diary

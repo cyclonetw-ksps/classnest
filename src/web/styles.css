@@ -801,8 +801,9 @@ input.has-error { border-color: var(--danger); background: var(--danger-soft); }
   mask: radial-gradient(circle at 8px 14px, transparent 6.5px, var(--mask-ink) 7px) 0 0 / 16px 14px repeat-x;
 }
 /* 還沒寫：沒有釘上去的紙，只有虛線框（滾邊淡淡留著，看得出是哪一組） */
-.diary-entry.is-empty { background: transparent; box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -1.5px; }
-.diary-entry.is-empty::before { opacity: 0.45; }
+/* 淺色時紙邊深線對紙面只有 1.7:1，虛線框改用混進灰墨的顏色（約 3.2:1）；深色時紙邊深線本來就有 3.6:1 */
+.diary-entry.is-empty { background: transparent; box-shadow: none; outline: 1.5px dashed color-mix(in srgb, var(--line-strong) 45%, var(--muted)); outline-offset: -1.5px; }
+@media (prefers-color-scheme: dark) { .diary-entry.is-empty { outline-color: var(--line-strong); } }
 .diary-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
 .sheet .diary-head h3, .sheet .diary-head h4 { margin: 0; font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); overflow-wrap: anywhere; }
 /* 已發送：實心草綠＋勾；草稿：墨色虛線框。形狀不同，不只靠顏色 */
@@ -839,9 +840,17 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 
 /* 分享頁的聯絡簿：一天一段，日期在上，下面是各組的紙；字給學生與家長看，大一點 */
 .pub-diary { display: grid; gap: 14px; margin-bottom: 36px; }
-.sheet .pub-diary > h2 { margin: 0; }
+/* 三層：段落標題（聯絡簿、公布欄）最大；日期是黑體粗字加上方虛線分隔；組名是 Title 字級 */
+.sheet .pub-section-title { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(1.7rem, 5vw, 2.2rem); }
+.pub-boards { display: grid; gap: 14px; }
 .pub-diary-day { display: grid; gap: 12px; }
-.sheet .pub-diary-day h3 { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.sheet .pub-diary-day h3.pub-diary-date {
+  display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin: 6px 0 0; padding-top: 12px;
+  border-top: 1.5px dashed var(--line-strong); font-family: var(--text); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums;
+}
+.pub-diary-date .tt-today { margin-left: 0; }
+.sheet .pub-diary .diary-head h4 { font-family: var(--text); font-weight: 700; font-size: 1.12rem; }
+.public .board-strip h3 { font-size: clamp(1.4rem, 3vw, 1.7rem); margin: 0; }
 .pub-diary .diary-list { gap: 16px; }
 .pub-diary .diary-lines dd { font-size: 1.1rem; line-height: 1.7; }
 .pub-diary .diary-lines dt { font-size: 1rem; }

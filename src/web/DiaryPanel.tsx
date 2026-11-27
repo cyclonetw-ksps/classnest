@@ -160,7 +160,7 @@ export function DiaryPanel({ state, act }: { state: ClassState; act: Act }) {
                 {e.status === "empty" ? (
                   e.suggested.homework || e.suggested.bring ? (
                     <div class="diary-suggest">
-                      <p class="diary-suggest-title">課表上今天這一組有：</p>
+                      <p class="diary-suggest-title">課表上{date === today ? "今天" : (WEEKDAY_NAMES[weekdayOf(date)] ?? "這天")}這一組有：</p>
                       <DiaryLines homework={e.suggested.homework} bring={e.suggested.bring} note="" />
                     </div>
                   ) : (
