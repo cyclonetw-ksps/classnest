@@ -275,13 +275,15 @@ function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justDone, setJustDone] = useState(false);
+  // 共用平板簽好後的換人倒數：另外記，簽到關閉或撤銷都不會取消它
+  const [leaving, setLeaving] = useState(false);
   const shared = me.mode === "shared";
 
   useEffect(() => {
-    if (!justDone || !shared) return;
+    if (!leaving) return;
     const t = setTimeout(onSignOut, NEXT_S * 1000);
     return () => clearTimeout(t);
-  }, [justDone, shared, onSignOut]);
+  }, [leaving, onSignOut]);
 
   // 伺服器說「已簽到」變回「沒簽到」（老師撤銷），或簽到已經關閉：清掉剛簽好的畫面，照伺服器的狀態顯示
   const wasChecked = useRef(me.checkin.checkedIn);
@@ -290,14 +292,14 @@ function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: 
     wasChecked.current = me.checkin.checkedIn;
   }, [me.checkin.checkedIn, me.checkin.open]);
 
-  if (!me.checkin.open) return null;
-  if (me.checkin.checkedIn || justDone)
+  if (!me.checkin.open && !leaving) return null;
+  if (me.checkin.checkedIn || justDone || leaving)
     return (
       <p class="checkin-done" role="status">
         <Check />
         <span>
           <span class="clause">簽到好了！</span>
-          {justDone && shared && <span class="clause">{NEXT_S} 秒後換下一位。</span>}
+          {leaving && <span class="clause">{NEXT_S} 秒後換下一位。</span>}
         </span>
       </p>
     );
@@ -312,6 +314,7 @@ function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: 
           try {
             await request("POST", "student/checkin");
             setJustDone(true);
+            if (shared) setLeaving(true);
             onReload();
           } catch (err) {
             setError(err instanceof ApiError ? err.message : "連不上伺服器，再按一次");
