@@ -89,6 +89,15 @@ export interface StudentView {
   total: number;
   rewards: { id: string; title: string; threshold: number; unlocked: boolean; granted: boolean }[];
   diary: { date: string; groupId: string; groupName: string; color: number; homework: string; bring: string; note: string; myNote: string }[];
+  // 簽到：老師開放中才能簽；checkedIn 是這一次開放有沒有簽過
+  checkin: { open: boolean; closesAt: number | null; checkedIn: boolean };
+}
+
+// 簽到：老師按「開放簽到」開一段時間，時間到自動關閉。window 是目前或最近一次（12 小時內）的開放，
+// checkins 是那一次已簽到的學生（不含撤銷的）。大螢幕只在 open 時列出名字
+export interface CheckinView {
+  window: { id: string; openedAt: number; closesAt: number; open: boolean } | null;
+  checkins: { id: string; studentId: string; displayName: string; at: number }[];
 }
 
 export interface PointEvent {
@@ -226,6 +235,7 @@ export interface ClassState {
   periods: Period[];
   slots: Slot[];
   devices: Device[];
+  checkin: CheckinView;
 }
 
 // 分享頁看到的內容：只有分享的面板與組別名稱，沒有任何學生資料，也不顯示是誰貼的
@@ -290,6 +300,10 @@ export const LIMITS = {
   cardAttempts: 5,
   cardLockMs: 5 * 60 * 1000,
   sharedSessionMs: 10 * 60 * 1000,
+  // 簽到：預設開放幾分鐘、最多幾分鐘、紀錄保留多久
+  checkinMinutes: 10,
+  checkinMaxMinutes: 60,
+  checkinKeepMs: 30 * 24 * 60 * 60 * 1000,
   // 通關碼連續答錯幾次後暫停一段時間
   pinAttempts: 10,
   pinLockMs: 10 * 60 * 1000,

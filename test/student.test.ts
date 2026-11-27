@@ -1,29 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ClassState, Device, Group, KioskRoster, LoginCards, Reason, Reward, Student, StudentView } from "../src/shared/types";
-import { api, call, FIRST_TEACHER, login, ok, state } from "./helpers";
+import type { ClassState, Group, KioskRoster, LoginCards, Reason, Reward, Student, StudentView } from "../src/shared/types";
+import { api, both, call, enroll, FIRST_TEACHER, login, ok, state, studentLogin } from "./helpers";
 
-// 老師在「這台」按設成學生平板：回傳學生平板憑證（cookie 字串）與完整的 set-cookie
-async function enroll(teacher: string, mode: "shared" | "personal" = "shared", name = "教室平板") {
-  const res = await call("/api/devices", { method: "POST", cookie: teacher, json: { name, mode } });
-  const cookies = res.headers.getSetCookie();
-  const body = (await res.json()) as { device: Device };
-  if (res.status !== 200) throw new Error(`enroll failed ${res.status}: ${JSON.stringify(body)}`);
-  const device = cookies.find((c) => c.startsWith("cn_device="))!;
-  return { status: res.status, cookies, device: device.split(";")[0], setCookie: device, id: body.device.id, body };
-}
-
-async function studentLogin(device: string, studentId: string, cards: number[], origin?: string) {
-  const res = await call("/api/student/login", {
-    method: "POST",
-    cookie: device,
-    json: { studentId, cards },
-    headers: origin ? { origin } : undefined,
-  });
-  const setCookie = res.headers.getSetCookie().find((c) => c.startsWith("cn_student=")) ?? "";
-  return { status: res.status, setCookie, cookie: setCookie.split(";")[0], body: (await res.json().catch(() => null)) as { error?: string } | null };
-}
-
-const both = (device: string, student: string) => `${device}; ${student}`;
 const cardsOf = (c: string, studentId: string) => ok(api<{ cards: number[] }>(c, "POST", `/api/students/${studentId}/cards`));
 const wrong = (cards: number[]) => [cards[1], cards[0], cards[2]];
 

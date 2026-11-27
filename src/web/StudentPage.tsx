@@ -55,6 +55,13 @@ export function StudentPage() {
     load();
   }, [load]);
 
+  // 學生頁開著時每 15 秒更新一次：老師開放簽到後按鈕就會出現
+  useEffect(() => {
+    if (phase !== "me") return;
+    const id = setInterval(() => document.visibilityState === "visible" && load(), 15_000);
+    return () => clearInterval(id);
+  }, [phase, load]);
+
   useEffect(() => {
     const title = me?.title ?? roster?.title;
     document.title = title ? `${title}｜學生` : "學生";
@@ -95,7 +102,7 @@ export function StudentPage() {
         </a>
       </main>
     );
-  if (phase === "me" && me) return <MePage me={me} onSignOut={signOut} />;
+  if (phase === "me" && me) return <MePage me={me} onSignOut={signOut} onReload={load} />;
   if (roster) return <Picker roster={roster} onLogin={load} />;
   return null;
 }
@@ -261,7 +268,72 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
 
 /* ---------- 學生自己的頁面 ---------- */
 
-function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
+// 簽到：老師開放中才出現；簽好後共用平板幾秒後自動換下一位
+const NEXT_S = 5;
+
+function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: () => void; onReload: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [justDone, setJustDone] = useState(false);
+  // 共用平板簽好後的換人倒數：另外記，簽到關閉或撤銷都不會取消它
+  const [leaving, setLeaving] = useState(false);
+  const shared = me.mode === "shared";
+
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(onSignOut, NEXT_S * 1000);
+    return () => clearTimeout(t);
+  }, [leaving, onSignOut]);
+
+  // 伺服器說「已簽到」變回「沒簽到」（老師撤銷），或簽到已經關閉：清掉剛簽好的畫面，照伺服器的狀態顯示
+  const wasChecked = useRef(me.checkin.checkedIn);
+  useEffect(() => {
+    if ((wasChecked.current && !me.checkin.checkedIn) || !me.checkin.open) setJustDone(false);
+    wasChecked.current = me.checkin.checkedIn;
+  }, [me.checkin.checkedIn, me.checkin.open]);
+
+  if (!me.checkin.open && !leaving) return null;
+  if (me.checkin.checkedIn || justDone || leaving)
+    return (
+      <p class="checkin-done" role="status">
+        <Check />
+        <span>
+          <span class="clause">簽到好了！</span>
+          {leaving && <span class="clause">{NEXT_S} 秒後換下一位。</span>}
+        </span>
+      </p>
+    );
+  return (
+    <div class="checkin-cta">
+      <button
+        class="btn primary checkin-btn"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            await request("POST", "student/checkin");
+            setJustDone(true);
+            if (shared) setLeaving(true);
+            onReload();
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : "連不上伺服器，再按一次");
+            onReload();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        我來了，簽到
+      </button>
+      <p class="kiosk-msg error" role="status">
+        {error}
+      </p>
+    </div>
+  );
+}
+
+function MePage({ me, onSignOut, onReload }: { me: StudentView; onSignOut: () => void; onReload: () => void }) {
   const shared = me.mode === "shared";
   // 共用平板：一陣子沒動就自動換人
   const timer = useRef<number>();
@@ -294,6 +366,7 @@ function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
         </button>
       </header>
       <main class="sheet me">
+        <CheckinCard me={me} onSignOut={onSignOut} onReload={onReload} />
         <section class="me-card" style={{ ...paperStyle(me.color), "--pin": me.color < 0 ? "var(--paper-red)" : paperAt(me.color).hue }} aria-labelledby="me-name">
           <span class="pin drop me-pin" aria-hidden="true" />
           <div class="me-who">

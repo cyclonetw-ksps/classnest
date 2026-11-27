@@ -2,20 +2,26 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { bellAt, bellChimes, bellKey, type Bell as BellState, type BellLesson } from "../shared/bell";
 import { atClock, formatClock, formatRemaining, parseClock, parseMinutes, remainingFraction, remainingMs, TIMER_MAX_MINUTES } from "../shared/clock";
 import { chimeDue, pauseRun, restartRun, resumeRun, runView, startRun, type Run } from "../shared/timer";
-import type { ClassState, WeekView } from "../shared/types";
+import { LIMITS, type CheckinView, type ClassState, type WeekView } from "../shared/types";
 import { localDate, mondayOf, weekdayOf } from "../shared/week";
-import { request } from "./api";
+import { ApiError, request } from "./api";
 import { playChime, readMuted, unlockChime, writeMuted } from "./chime";
 import { paperAt } from "./palette";
 import { Bell, BellOff, Expand, Pause, Play, Restart, Shrink, Stop } from "./icons";
 
-// 大螢幕：投影用的計時畫面。只有計時與組別、科目，不放任何學生資料或分數。
+// 大螢幕：投影用的計時畫面。只有計時與組別、科目；學生資料只有開放簽到時「已簽到的顯示名」，不放分數，也不列誰還沒來。
 // 兩種模式：計時（自訂分鐘或倒數到時刻），以及依課表（讀本週課表，自動倒數下課與上課，判斷在 src/shared/bell.ts）。
 // 計時以結束時刻為準（endAt），每次重畫都用裝置時鐘重新算，背景分頁回來也不會飄。
 // 狀態轉移（暫停、繼續、重來、何時響）在 src/shared/timer.ts，有測試。
 
 const PRESETS = [1, 3, 5, 10, 15, 20, 30];
 const TICKS = Array.from({ length: 12 }, (_, i) => i * 30);
+
+// 毫秒時間 → 「08:52」（這台裝置的時區）
+function clockOf(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 function reducedMotion() {
   return matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -60,6 +66,8 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   const [announce, setAnnounce] = useState("");
   const [full, setFull] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
+  const [checkin, setCheckin] = useState<CheckinView>(state.checkin);
+  const [checkinError, setCheckinError] = useState("");
   const chimedFor = useRef<number | null>(null);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
@@ -158,6 +166,34 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
       void lock?.release().catch(() => {});
     };
   }, [keepAwake]);
+
+  // 簽到：老師端的狀態跟著 state 更新；開放中每 4 秒讀一次名單，沒開放時每 30 秒看一次（其他老師可能開了）
+  useEffect(() => setCheckin(state.checkin), [state.checkin]);
+  const checkinOpen = !!checkin.window?.open;
+  useEffect(() => {
+    if (hidden) return;
+    let live = true;
+    const load = () =>
+      request<CheckinView>("GET", "checkin")
+        .then((v) => live && setCheckin(v))
+        .catch(() => {});
+    const id = setInterval(load, checkinOpen ? 4000 : 30_000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [hidden, checkinOpen]);
+
+  async function checkinAction(path: string, body?: unknown, said?: string) {
+    setCheckinError("");
+    try {
+      const v = await request<CheckinView | { id: string }>("POST", path, body);
+      setCheckin("checkins" in v ? v : await request<CheckinView>("GET", "checkin"));
+      if (said) setAnnounce(said);
+    } catch (err) {
+      setCheckinError(err instanceof ApiError ? err.message : "連線出了問題，請稍後再試");
+    }
+  }
 
   useEffect(() => {
     const onChange = () => setFull(!!stageRef.current && document.fullscreenElement === stageRef.current);
@@ -273,8 +309,10 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   // 組別色小方塊永遠跟著組別（停課也一樣），沒有組別就不畫
   const swatch = lesson ? groupHue(lesson.groupId) : null;
   const lessonText = lesson ? [groupName(lesson.groupId), lesson.subject].filter((x, i, a) => x && a.indexOf(x) === i).join("・") : "";
-  const stageClass = ["stage", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
-  const label = bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
+  // 沒在計時、只開放簽到時：舞台讓給簽到名牌，不放空鐘面
+  const checkinOnly = checkinOpen && idle;
+  const stageClass = ["stage", checkinOpen && "checking", checkinOnly && "checkin-only", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
+  const label = checkinOnly ? "簽到" : bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
 
   return (
     <section aria-labelledby="screen-title" class="screen" hidden={hidden}>
@@ -307,6 +345,60 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                   依課表自動倒數
                 </button>
               </div>
+            )}
+          </div>
+
+          <div class="card setup-block checkin-block">
+            <h3>簽到</h3>
+            {checkinOpen ? (
+              <>
+                <p class="bell-on" role="status">
+                  簽到開放到 {clockOf(checkin.window!.closesAt)}
+                </p>
+                <div class="form-actions start">
+                  <button class="btn" type="button" onClick={() => checkinAction("checkin/close", undefined, "已結束簽到")}>
+                    提早結束
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p class="meta phrases">
+                  <span>學生在學生平板登入後</span>
+                  <span>按「我來了，簽到」，</span>
+                  <span>大螢幕會列出已簽到的人。</span>
+                </p>
+                <div class="form-actions start">
+                  <button class="btn primary" type="button" onClick={() => checkinAction("checkin/open", {}, "已開放簽到")}>
+                    開放簽到 {LIMITS.checkinMinutes} 分鐘
+                  </button>
+                </div>
+              </>
+            )}
+            <p class="field-error" role="alert">
+              {checkinError}
+            </p>
+            {checkin.window && (
+              <>
+                <p class="meta checkin-count">
+                  {checkinOpen ? "已簽到" : `上一次（${clockOf(checkin.window.openedAt)} 開放）簽到`} {checkin.checkins.length} 人
+                </p>
+                {checkin.checkins.length > 0 && (
+                  <ul class="rows compact checkin-rows">
+                    {checkin.checkins.map((c) => (
+                      <li key={c.id}>
+                        <span class="checkin-who">
+                          <strong>{c.displayName}</strong>
+                          <span class="meta">{clockOf(c.at)}</span>
+                        </span>
+                        <button class="btn quiet small" type="button" onClick={() => checkinAction(`checkins/${c.id}/undo`, undefined, `已撤銷 ${c.displayName} 的簽到`)} aria-label={`撤銷 ${c.displayName} 的簽到`}>
+                          撤銷
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
 
@@ -459,6 +551,29 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                 </div>
               )}
             </div>
+            {checkinOpen && (
+              <div class="stage-checkin">
+                <p class="stage-checkin-head">
+                  <span class="stage-tag">簽到中・到 {clockOf(checkin.window!.closesAt)}</span>
+                  <span class="stage-checkin-count">已簽到 {checkin.checkins.length} 人</span>
+                </p>
+                {checkin.checkins.length > 0 ? (
+                  <ul class={`stage-names${checkin.checkins.length > 12 ? " many" : ""}`} aria-label="已簽到">
+                    {checkin.checkins.map((c) => (
+                      <li key={c.id} class="stage-name">
+                        <span class="pin drop" aria-hidden="true" />
+                        {c.displayName}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p class="stage-note phrases">
+                    <span>在學生平板上點自己的名字，</span>
+                    <span>登入後按「我來了，簽到」。</span>
+                  </p>
+                )}
+              </div>
+            )}
             <div class="stage-bar">
               <div class="stage-group">
               {!scheduling && run?.kind === "minutes" && !done && (
