@@ -5,9 +5,10 @@
 ## 架構
 
 - `src/worker/`：Cloudflare Worker。`index.ts` 只做路由、Google 登入驗證與跨站檢查；`classroom.ts` 是全站唯一的 Durable Object（一套部署一個班級），資料都在它內建的 SQLite，所有權限與內容檢查都在這裡。
-- `src/worker/boards.ts`：公布欄（面板、便條）、分享頁與 agent 金鑰，資料在同一個 Durable Object；`src/worker/mcp.ts` 是 agent 的 MCP 入口（`/api/mcp`，Streamable HTTP、只回 JSON，金鑰用 `Authorization: Bearer`）。agent 能用的工具只有組別名稱、面板與便條（白名單在 `BoardStore.agentTool`），以及讀課表、寫每週內容（`get_timetable`、`get_week`、`set_week_plan`，在 `ClassroomDO.agentCall`）；換課、停課、改節次與固定課表只給老師。要開放其他資料給 agent 時另開切片，補工具與測試。
+- `src/worker/boards.ts`：公布欄（面板、便條）、分享頁與 agent 金鑰，資料在同一個 Durable Object；`src/worker/mcp.ts` 是 agent 的 MCP 入口（`/api/mcp`，Streamable HTTP、只回 JSON，金鑰用 `Authorization: Bearer`）。agent 能用的工具只有組別名稱、面板與便條（白名單在 `BoardStore.agentTool`），以及讀課表、寫每週內容（`get_timetable`、`get_week`、`set_week_plan`）與讀、草擬聯絡簿（`get_contact_book`、`draft_contact_book`），後兩組在 `ClassroomDO.agentCall`；換課、停課、改節次與固定課表、發送聯絡簿只給老師，聯絡簿的個別加註不給 agent。要開放其他資料給 agent 時另開切片，補工具與測試。
 - `src/worker/schedule.ts`：課表（節次、固定週課表、每週各節的內容、作業、要帶的東西、換課與停課），資料在同一個 Durable Object；週以週一的 `YYYY-MM-DD` 代表，日期計算在 `src/shared/week.ts`。
-- 分享頁是 `/s/<分享代碼>`，資料來自 `POST /api/public/<代碼>`：只回分享的面板與組別名稱，不回任何學生資料，也不回是誰貼的（有測試擋）。
+- `src/worker/diary.ts`：聯絡簿（一天一組一則，作業、要帶的東西、備註，草稿或已發送；個別學生加註），資料在同一個 Durable Object；從當天課表帶入建議與複製文字是 `src/shared/diary.ts` 的純函式。
+- 分享頁是 `/s/<分享代碼>`，資料來自 `POST /api/public/<代碼>`：只回分享的面板、已發送的聯絡簿（最近 5 個日期）與組別名稱，不回任何學生資料、個別加註，也不回是誰貼的或寫的（有測試擋）。
 - `src/web/`：Preact 前端，`vite build` 輸出到 `dist/`，由 Worker 靜態資源送出。
 - `src/shared/`：前後端共用型別與上限值。
 

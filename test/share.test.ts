@@ -39,7 +39,7 @@ describe("分享頁", () => {
     const ids = r.body.boards.map((b) => b.id);
     expect(ids).toEqual(expect.arrayContaining([whole.id, onlyA.id, onlyB.id]));
     expect(ids).not.toContain(secret.id);
-    expect(Object.keys(r.body).sort()).toEqual(["boards", "groups", "title"]);
+    expect(Object.keys(r.body).sort()).toEqual(["boards", "diary", "groups", "title"]);
     expect(r.text).not.toContain("不該外流的名字");
     expect(r.text).not.toContain("school.test");
     for (const k of ["students", "events", "rewards", "reasons", "teachers", "createdBy", "total"]) expect(r.text).not.toContain(`"${k}"`);
@@ -110,5 +110,36 @@ describe("分享頁", () => {
   it("未登入不能改分享設定", async () => {
     expect((await call("/api/share/reset", { method: "POST" })).status).toBe(401);
     expect((await call("/api/share", { method: "PUT", json: { pin: null } })).status).toBe(401);
+  });
+});
+
+describe("分享頁的聯絡簿", () => {
+  it("只有已發送的；沒有草稿、個別加註、學生名字與誰寫的；可依組切換", async () => {
+    const { c, g1, g2, share } = await setup();
+    // 每次 setup 都新建一位同名學生；最後一位才在這次的甲組
+    const kid = (await state(c)).students.filter((s) => s.displayName === "不該外流的名字").at(-1)!;
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-02", groupId: g1.id, homework: "甲組作業", note: "甲組備註", status: "sent", studentNotes: [{ studentId: kid.id, text: "私下的加註" }] }));
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-02", groupId: g2.id, homework: "乙組草稿", status: "draft" }));
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-03", groupId: g2.id, bring: "乙組要帶", status: "sent" }));
+    const r = await view(share.code);
+    expect(r.body.diary).toEqual([
+      { date: "2026-12-03", groupId: g2.id, homework: "", bring: "乙組要帶", note: "" },
+      { date: "2026-12-02", groupId: g1.id, homework: "甲組作業", bring: "", note: "甲組備註" },
+    ]);
+    for (const hidden of ["乙組草稿", "私下的加註", "不該外流的名字", kid.id, FIRST_TEACHER]) expect(r.text).not.toContain(hidden);
+    expect((await view(share.code, { group: g1.id })).body.diary.map((d) => d.groupId)).toEqual([g1.id]);
+  });
+
+  it("只列最近 5 個有發送的日期；只有聯絡簿的組也出現在組別切換", async () => {
+    const { c, share } = await setup();
+    const g = await ok(api<Group>(c, "POST", "/api/groups", { name: "只有聯絡簿的組" }));
+    for (const date of ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-09"]) {
+      await ok(api(c, "PUT", "/api/diary", { date, groupId: g.id, homework: `作業 ${date}`, status: "sent" }));
+    }
+    const r = await view(share.code, { group: g.id });
+    const dates = r.body.diary.map((d) => d.date);
+    expect(dates).not.toContain("2026-11-02");
+    expect(new Set(r.body.diary.map((d) => d.date)).size).toBeLessThanOrEqual(5);
+    expect((await view(share.code)).body.groups.some((x) => x.id === g.id)).toBe(true);
   });
 });
