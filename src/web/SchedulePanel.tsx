@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { classNow } from "../shared/bell";
 import { LIMITS, type ClassState, type Lesson, type Period, type Slot, type WeekView } from "../shared/types";
 import { addDays, localDate, mondayOf, weekdayOf, WEEKDAY_NAMES, WEEKDAYS } from "../shared/week";
 import { ApiError, request } from "./api";
@@ -20,6 +21,21 @@ function thisWeek(): string {
   const today = localDate(new Date());
   const monday = mondayOf(today);
   return weekdayOf(today) >= 6 ? addDays(monday, 7) : monday;
+}
+
+// 每 30 秒重算一次「現在這一節」；分頁在背景時瀏覽器會放慢，回到前景下一次就對了
+function useNowPeriod(periods: Period[]): string | null {
+  const calc = () => {
+    const now = Date.now();
+    return classNow(now, weekdayOf(localDate(new Date(now))), periods);
+  };
+  const [id, setId] = useState(calc);
+  useEffect(() => {
+    setId(calc());
+    const t = setInterval(() => setId(calc()), 30_000);
+    return () => clearInterval(t);
+  }, [periods]);
+  return id;
 }
 
 function todayWeekday(): number {
@@ -81,9 +97,19 @@ function Grid(props: {
   periods: Period[];
   days: { weekday: number; date?: string }[];
   today?: string;
+  // 今天正在上的那一節（只在有日期的每週計畫標）
+  nowPeriod?: string | null;
+  // 剛儲存的那一格「weekday:periodId」，播一次釘上動畫
+  fresh?: string;
   cell: (weekday: number, period: Period) => ComponentChildren;
 }) {
   const [day, setDay] = useState(todayWeekday);
+  const isToday = (d: { date?: string }) => !!d.date && d.date === props.today;
+  const isNow = (d: { date?: string }, p: Period) => isToday(d) && p.id === props.nowPeriod;
+  const cellClass = (d: { weekday: number; date?: string }, p: Period) =>
+    [isToday(d) && "is-today", isNow(d, p) && "is-now", props.fresh === `${d.weekday}:${p.id}` && "is-fresh"].filter(Boolean).join(" ") || undefined;
+  const nowTag = <span class="tt-now">上課中</span>;
+  const shownDay = props.days.find((d) => d.weekday === day) ?? props.days[0];
   const head = (d: { weekday: number; date?: string }) => (
     <>
       {WEEKDAY_NAMES[d.weekday]}
@@ -100,7 +126,7 @@ function Grid(props: {
             <tr>
               <td />
               {props.days.map((d) => (
-                <th key={d.weekday} scope="col" class={d.date && d.date === props.today ? "is-today" : undefined}>
+                <th key={d.weekday} scope="col" class={isToday(d) ? "is-today" : undefined}>
                   {head(d)}
                 </th>
               ))}
@@ -114,9 +140,10 @@ function Grid(props: {
                   <span class="tt-time">
                     {p.start}–{p.end}
                   </span>
+                  {props.days.some((d) => isNow(d, p)) && nowTag}
                 </th>
                 {props.days.map((d) => (
-                  <td key={d.weekday} class={d.date && d.date === props.today ? "is-today" : undefined}>
+                  <td key={d.weekday} class={cellClass(d, p)}>
                     {props.cell(d.weekday, p)}
                   </td>
                 ))}
@@ -134,23 +161,35 @@ function Grid(props: {
             </label>
           ))}
         </div>
-        <h3 class="tt-day-title">{head(props.days.find((d) => d.weekday === day) ?? props.days[0])}</h3>
+        <h3 class="tt-day-title">{head(shownDay)}</h3>
         <ol class="tt-list">
           {props.periods.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} class={cellClass(shownDay, p)}>
               <div class="tt-list-head">
                 <span class="tt-period">{p.label}</span>
                 <span class="tt-time">
                   {p.start}–{p.end}
                 </span>
+                {isNow(shownDay, p) && nowTag}
               </div>
-              {props.cell(day, p)}
+              {props.cell(shownDay.weekday, p)}
             </li>
           ))}
         </ol>
       </div>
     </div>
   );
+}
+
+// 剛儲存的格子標記一下，動畫播完（0.55 秒）就清掉，同一格再存一次還會再播
+function useFresh(): [string, (key: string) => void] {
+  const [key, setKey] = useState("");
+  useEffect(() => {
+    if (!key) return;
+    const t = setTimeout(() => setKey(""), 700);
+    return () => clearTimeout(t);
+  }, [key]);
+  return [key, setKey];
 }
 
 function useGroups(state: ClassState) {
@@ -293,6 +332,7 @@ function PeriodsView({ state, act }: { state: ClassState; act: Act }) {
 function FixedView({ state, act }: { state: ClassState; act: Act }) {
   const { colorOf, nameOf } = useGroups(state);
   const [draft, setDraft] = useState<(Slot & { label: string }) | null>(null);
+  const [fresh, setFresh] = useFresh();
   const slotAt = (weekday: number, periodId: string) => state.slots.find((s) => s.weekday === weekday && s.periodId === periodId);
 
   return (
@@ -302,6 +342,7 @@ function FixedView({ state, act }: { state: ClassState; act: Act }) {
         caption="固定課表"
         periods={state.periods}
         days={WEEKDAYS.map((weekday) => ({ weekday }))}
+        fresh={fresh}
         cell={(weekday, p) => {
           const s = slotAt(weekday, p.id);
           const label = `${WEEKDAY_NAMES[weekday]}${p.label}`;
@@ -334,7 +375,10 @@ function FixedView({ state, act }: { state: ClassState; act: Act }) {
             onSubmit={async (e) => {
               e.preventDefault();
               const { label, ...slot } = draft;
-              if (await act(() => request("PUT", "slots", slot), slot.subject.trim() ? `已排好${label}` : `已清掉${label}`)) setDraft(null);
+              if (await act(() => request("PUT", "slots", slot), slot.subject.trim() ? `已排好${label}` : `已清掉${label}`)) {
+                setDraft(null);
+                if (slot.subject.trim()) setFresh(`${slot.weekday}:${slot.periodId}`);
+              }
             }}
           >
             <div class="field">
@@ -385,7 +429,9 @@ function WeekPlan({ state, act }: { state: ClassState; act: Act }) {
   const [draft, setDraft] = useState<LessonDraft | null>(null);
   const [copied, setCopied] = useState("");
   const [retry, setRetry] = useState(0);
+  const [fresh, setFresh] = useFresh();
   const today = localDate(new Date());
+  const nowPeriod = useNowPeriod(state.periods);
 
   // 換週或老師端資料更新後重新讀這一週
   useEffect(() => {
@@ -435,7 +481,10 @@ function WeekPlan({ state, act }: { state: ClassState; act: Act }) {
       cancelled: draft.cancelled,
       note: draft.cancelled ? draft.note : "",
     };
-    if (await act(() => request("PUT", "lessons", body), `已儲存${draft.title}`)) setDraft(null);
+    if (await act(() => request("PUT", "lessons", body), `已儲存${draft.title}`)) {
+      setDraft(null);
+      setFresh(`${l.weekday}:${l.periodId}`);
+    }
   }
 
   return (
@@ -492,6 +541,8 @@ function WeekPlan({ state, act }: { state: ClassState; act: Act }) {
             periods={shown.periods}
             days={shown.days}
             today={today}
+            nowPeriod={nowPeriod}
+            fresh={fresh}
             cell={(weekday, p) => {
               const l = lessonAt(weekday, p.id);
               if (!l) return null;

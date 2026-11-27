@@ -3,7 +3,7 @@ import { api, call, FIRST_TEACHER, googleToken, login, ok, state } from "./helpe
 
 async function loginStatus(credential: string) {
   const res = await call("/api/auth/google", { method: "POST", json: { credential } });
-  return { status: res.status, cookie: res.headers.get("set-cookie") };
+  return { status: res.status, cookie: res.headers.get("set-cookie"), body: (await res.json().catch(() => null)) as { error?: string } | null };
 }
 
 describe("老師登入", () => {
@@ -30,6 +30,7 @@ describe("老師登入", () => {
     const r = await loginStatus(await googleToken("stranger@school.test"));
     expect(r.status).toBe(403);
     expect(r.cookie).toBeNull();
+    expect(r.body?.error).toBe("這個 Google 帳號不在老師名單內，請已登入的老師邀請你");
   });
 
   it("拒絕受眾不符、過期、信箱未驗證、簽章被竄改或不是 RS256 的 token", async () => {
