@@ -13,6 +13,7 @@ import {
 } from "../shared/types";
 import type { Env } from "./env";
 import { BoardStore, type AgentIdentity } from "./boards";
+import { CheckinStore } from "./checkin";
 import { DiaryStore, lessonsOnFrom } from "./diary";
 import { KioskStore, type DeviceAuth } from "./kiosk";
 import { ScheduleStore } from "./schedule";
@@ -49,6 +50,7 @@ export class ClassroomDO extends DurableObject<Env> {
   private schedule: ScheduleStore;
   private diary: DiaryStore;
   private kiosk: KioskStore;
+  private checkins: CheckinStore;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -83,6 +85,7 @@ export class ClassroomDO extends DurableObject<Env> {
     this.schedule = new ScheduleStore(this.sql, ctx.storage);
     this.diary = new DiaryStore(this.sql, ctx.storage, lessonsOnFrom((monday) => this.schedule.week(monday)));
     this.kiosk = new KioskStore(this.sql, ctx.storage);
+    this.checkins = new CheckinStore(this.sql);
   }
 
   /* ---------- 登入與工作階段 ---------- */
@@ -183,6 +186,7 @@ export class ClassroomDO extends DurableObject<Env> {
     const studentId = await this.kiosk.studentAuth(device, studentToken);
     if (!studentId) return { status: 401, json: JSON.stringify({ error: "請先點自己的名字登入" }) };
     if (route === "GET me") return reply(() => ok(this.studentView(device, studentId)));
+    if (route === "POST checkin") return reply(() => this.checkins.checkin(studentId, device.id));
     return { status: 404, json: JSON.stringify({ error: "找不到這個功能" }) };
   }
 
@@ -303,6 +307,12 @@ export class ClassroomDO extends DurableObject<Env> {
         return this.kiosk.deleteDevice(id);
       case "POST students/:id/cards":
         return this.kiosk.generateCards(id);
+      case "GET checkin":
+        return ok(this.checkins.view());
+      case "POST checkin/:id":
+        return id === "open" ? this.checkins.open(me.email, body) : id === "close" ? this.checkins.close() : fail(404, "找不到這個功能");
+      case "POST checkins/:id/undo":
+        return this.checkins.undo(me.email, id);
       case "GET login-cards":
         return ok(this.kiosk.loginCards());
       case "GET diary/:id":
@@ -717,6 +727,7 @@ export class ClassroomDO extends DurableObject<Env> {
         .filter((w) => w.active)
         .map((w) => ({ id: w.id, title: w.title, threshold: w.threshold, unlocked: total >= w.threshold, granted: granted.has(w.id) })),
       diary: this.diary.forStudent(studentId).map((d) => ({ ...d, color: colors.get(d.groupId) ?? -1 })),
+      checkin: this.checkins.forStudent(studentId),
     };
   }
 
@@ -757,6 +768,7 @@ export class ClassroomDO extends DurableObject<Env> {
       share: this.board.share(),
       agentKeys: this.board.agentKeys(),
       devices: this.kiosk.devices(),
+      checkin: this.checkins.view(),
       periods: this.schedule.periods(),
       slots: this.schedule.slots(),
     };
