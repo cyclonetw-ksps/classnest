@@ -144,6 +144,31 @@ export interface WeekView {
   lessons: Lesson[];
 }
 
+// 聯絡簿：一天一組一則。empty 是還沒寫（只有從課表帶入的建議），draft 是草稿（老師或 agent 寫的），
+// sent 是老師按了發送（分享頁看得到）
+export type DiaryStatus = "empty" | "draft" | "sent";
+
+export interface DiaryEntry {
+  date: string;
+  groupId: string;
+  status: DiaryStatus;
+  homework: string;
+  bring: string;
+  note: string;
+  // 從當天課表帶入的建議（這一組各節的作業與要帶的東西；停課的節不算）
+  suggested: { homework: string; bring: string };
+  // 給個別學生的加註；不會出現在分享頁，也不給 agent
+  studentNotes: { studentId: string; text: string }[];
+  updatedBy: string;
+  updatedAt: number | null;
+  sentAt: number | null;
+}
+
+export interface DiaryDay {
+  date: string;
+  entries: DiaryEntry[];
+}
+
 export interface ClassState {
   me: { email: string; name: string };
   title: string;
@@ -168,11 +193,20 @@ export interface PublicBoard {
   groupIds: string[];
   cards: PublicCard[];
 }
+// 分享頁的聯絡簿：只有已發送的，沒有個別加註、也沒有是誰寫的
+export interface PublicDiary {
+  date: string;
+  groupId: string;
+  homework: string;
+  bring: string;
+  note: string;
+}
 export interface PublicView {
   title: string;
   // color 是這個組在全部組別裡的順序，用來取同一張色紙（和老師端一致）
   groups: { id: string; name: string; color: number }[];
   boards: PublicBoard[];
+  diary: PublicDiary[];
 }
 
 export const LIMITS = {
@@ -202,6 +236,12 @@ export const LIMITS = {
   lessonContent: 500,
   homework: 300,
   lessonNote: 40,
+  diaryHomework: 500,
+  diaryBring: 200,
+  diaryNote: 300,
+  studentNote: 200,
+  // 分享頁顯示最近幾個有發送聯絡簿的日期
+  publicDiaryDays: 5,
   // 通關碼連續答錯幾次後暫停一段時間
   pinAttempts: 10,
   pinLockMs: 10 * 60 * 1000,

@@ -11,6 +11,7 @@ import {
 } from "../shared/types";
 import type { Env } from "./env";
 import { BoardStore, type AgentIdentity } from "./boards";
+import { DiaryStore, lessonsOnFrom } from "./diary";
 import { ScheduleStore } from "./schedule";
 import { bool, fail, idList, InputError, int, newId, newSessionToken, ok, sha256Hex, text, type Body, type Result } from "./validate";
 
@@ -43,6 +44,7 @@ export class ClassroomDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private board: BoardStore;
   private schedule: ScheduleStore;
+  private diary: DiaryStore;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -75,6 +77,7 @@ export class ClassroomDO extends DurableObject<Env> {
     `);
     this.board = new BoardStore(this.sql, ctx.storage);
     this.schedule = new ScheduleStore(this.sql, ctx.storage);
+    this.diary = new DiaryStore(this.sql, ctx.storage, lessonsOnFrom((monday) => this.schedule.week(monday)));
   }
 
   /* ---------- 登入與工作階段 ---------- */
@@ -133,7 +136,7 @@ export class ClassroomDO extends DurableObject<Env> {
   /* ---------- 分享頁（不需登入，只有代碼與可選通關碼） ---------- */
 
   async publicView(code: string, body: Body): Promise<{ status: number; json: string }> {
-    return this.board.publicView(code, body ?? {});
+    return this.board.publicView(code, body ?? {}, this.diary);
   }
 
   /* ---------- agent 入口（MCP；用金鑰，不用老師登入） ---------- */
@@ -149,8 +152,8 @@ export class ClassroomDO extends DurableObject<Env> {
     return reply(() => this.agentCall(agent, name, args ?? {}));
   }
 
-  // agent 能呼叫的工具：課表三個在這裡，其餘（組別、面板、卡片）在 BoardStore.agentTool；
-  // 兩邊都不認得的名稱一律拒絕。換課、停課、改節次與固定課表只有老師能做。
+  // agent 能呼叫的工具：課表三個與聯絡簿兩個在這裡，其餘（組別、面板、卡片）在 BoardStore.agentTool；
+  // 兩邊都不認得的名稱一律拒絕。換課、停課、改節次與固定課表只有老師能做；聯絡簿 agent 只能草擬，發送只有老師能做。
   private agentCall(agent: AgentIdentity, name: string, args: Body): Result {
     switch (name) {
       case "get_timetable":
@@ -164,6 +167,10 @@ export class ClassroomDO extends DurableObject<Env> {
       }
       case "set_week_plan":
         return this.schedule.setWeekPlan(`agent：${agent.name}`, args);
+      case "get_contact_book":
+        return this.diary.agentDay(args.date);
+      case "draft_contact_book":
+        return this.diary.agentDraft(`agent：${agent.name}`, args);
       default:
         return this.board.agentTool(agent, name, args);
     }
@@ -239,6 +246,10 @@ export class ClassroomDO extends DurableObject<Env> {
         return this.schedule.copyLastWeek(id, me.email);
       case "PUT lessons":
         return this.schedule.setLesson(me.email, body);
+      case "GET diary/:id":
+        return this.diary.day(id);
+      case "PUT diary":
+        return this.diary.save(me.email, body);
       default:
         return fail(404, "找不到這個功能");
     }

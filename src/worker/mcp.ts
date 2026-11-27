@@ -1,6 +1,7 @@
 // agent 入口（MCP，Streamable HTTP，不開串流）：每個 JSON-RPC 請求一個 POST，回 application/json。
 // 金鑰用 Authorization: Bearer 帶；金鑰驗證與每個工具的權限都在 Durable Object 裡（ClassroomDO.agentTool）。
-// 工具只有組別名稱、面板與卡片、課表（讀節次與某一週、寫每週內容）；學生、分數、獎勵、老師、設定都不在這裡。
+// 工具只有組別名稱、面板與卡片、課表（讀節次與某一週、寫每週內容）、聯絡簿（讀某一天、草擬）；
+// 學生、分數、獎勵、老師、設定與聯絡簿的個別加註都不在這裡。
 import { LIMITS } from "../shared/types";
 
 export interface AgentPort {
@@ -18,7 +19,8 @@ const instructions = (origin: string) => `班級布告欄（${origin}）：老�
 - 連結與作業卡在網頁上可以放大成 QR Code，所以網址請給學生能直接打開的那一個。
 - 先用 list_groups 查組別代號，再建立面板或卡片。
 - 課表：get_timetable 查節次（代號與時間）和固定週課表（週一到週五每節哪組上什麼科）；get_week 看某一週（weekStart 是那週週一的 YYYY-MM-DD）；set_week_plan 一次填好整週各節的教學內容、作業與要帶的東西。換課、停課、改節次與固定課表只有老師能在網頁上做。
-- 這個入口看不到也改不了學生、分數、獎勵與設定。`;
+- 聯絡簿：一天一組一則（作業、要帶的東西、備註）。get_contact_book 看某一天各組的聯絡簿與從課表帶入的建議（suggested）；draft_contact_book 草擬一組，只會存成草稿，老師在網頁上按「發送」家長才看得到。已發送的不能改。
+- 這個入口看不到也改不了學生、分數、獎勵、設定與聯絡簿的個別加註。`;
 
 const id = { type: "string", description: "代號" };
 const boardProps = {
@@ -37,6 +39,7 @@ const cardProps = {
 };
 
 const weekStart = { type: "string", description: "那一週週一的日期 YYYY-MM-DD" };
+const diaryDate = { type: "string", description: "日期 YYYY-MM-DD" };
 
 const TOOLS = [
   { name: "list_groups", title: "列出組別", description: "列出目前使用中的組別（代號與名稱）。", inputSchema: { type: "object", properties: {} } },
@@ -112,6 +115,29 @@ const TOOLS = [
         },
       },
       required: ["weekStart", "lessons"],
+    },
+  },
+  {
+    name: "get_contact_book",
+    title: "看某一天的聯絡簿",
+    description:
+      "列出某一天每個使用中的組的聯絡簿：組別代號與名稱、狀態（empty 還沒寫、draft 草稿、sent 已發送）、作業、要帶的東西、備註，以及從當天課表帶入的建議（suggested）。",
+    inputSchema: { type: "object", properties: { date: diaryDate }, required: ["date"] },
+  },
+  {
+    name: "draft_contact_book",
+    title: "草擬聯絡簿",
+    description: `草擬某一天某一組的聯絡簿，只會存成草稿（老師按「發送」才生效）；沒給的欄位不變，給空字串代表清掉。已發送的不能改。作業最多 ${LIMITS.diaryHomework} 字、要帶的東西 ${LIMITS.diaryBring} 字、備註 ${LIMITS.diaryNote} 字。`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        date: diaryDate,
+        groupId: { type: "string", description: "組別代號（list_groups 查）" },
+        homework: { type: "string", description: "作業（可換行）" },
+        bring: { type: "string", description: "要帶的東西" },
+        note: { type: "string", description: "給家長的備註" },
+      },
+      required: ["date", "groupId"],
     },
   },
 ];

@@ -11,6 +11,7 @@ import {
   type BoardCard,
   type CardKind,
   type PublicBoard,
+  type PublicDiary,
   type PublicView,
   type ShareInfo,
 } from "../shared/types";
@@ -340,7 +341,11 @@ export class BoardStore {
   }
 
   // 分享頁：代碼不對回 404；設了通關碼要答對；連續答錯 LIMITS.pinAttempts 次後暫停 LIMITS.pinLockMs
-  async publicView(code: string, body: Body): Promise<{ status: number; json: string }> {
+  async publicView(
+    code: string,
+    body: Body,
+    diary: { published(group: string): PublicDiary[]; publishedGroups(): string[] },
+  ): Promise<{ status: number; json: string }> {
     const reply = (status: number, data: unknown) => ({ status, json: JSON.stringify(data) });
     if (!code || code !== this.setting("share_code")) return reply(404, { error: "這個分享連結已失效，請向老師索取新的連結" });
     const hash = this.setting("share_pin_hash");
@@ -369,7 +374,7 @@ export class BoardStore {
     }
     const group = typeof body.group === "string" ? body.group : "";
     const shared = this.boards().filter((b) => b.shared);
-    const used = new Set(shared.flatMap((b) => b.groupIds));
+    const used = new Set([...shared.flatMap((b) => b.groupIds), ...diary.publishedGroups()]);
     const boards: PublicBoard[] = shared
       .filter((b) => !group || b.groupIds.length === 0 || b.groupIds.includes(group))
       .map((b) => ({
@@ -388,6 +393,7 @@ export class BoardStore {
         .filter((g) => used.has(g.id))
         .map((g) => ({ ...g, color: order.indexOf(g.id) })),
       boards,
+      diary: diary.published(group),
     };
     return reply(200, view);
   }

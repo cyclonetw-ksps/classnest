@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentKey, Board, Group, Period, WeekView } from "../src/shared/types";
+import type { AgentKey, Board, DiaryDay, DiaryEntry, Group, Period, Student, WeekView } from "../src/shared/types";
 import { api, call, FIRST_TEACHER, login, mcp, ok, state, tool } from "./helpers";
 
 async function newKey(c: string, name: string) {
@@ -46,7 +46,7 @@ describe("MCP 入口", () => {
     expect(init.status).toBe(200);
     expect(init.body?.result.protocolVersion).toBe("2025-06-18");
     const names = (await mcp(k.key, "tools/list")).body!.result.tools.map((t: { name: string }) => t.name).sort();
-    expect(names).toEqual(["create_board", "create_card", "delete_board", "delete_card", "get_timetable", "get_week", "list_boards", "list_groups", "set_week_plan", "update_board", "update_card"]);
+    expect(names).toEqual(["create_board", "create_card", "delete_board", "delete_card", "draft_contact_book", "get_contact_book", "get_timetable", "get_week", "list_boards", "list_groups", "set_week_plan", "update_board", "update_card"]);
   });
 
   it("agent 可以列出組別（只有名稱，沒有學生）", async () => {
@@ -200,5 +200,65 @@ describe("MCP 課表工具", () => {
     await tool(k.key, "set_week_plan", { weekStart: "2026-12-07", lessons: [{ weekday: 1, periodId: p1.id, content: "x", cancelled: true, change: { groupId: null, subject: "偷換" } }] });
     const w = await tool(k.key, "get_week", { weekStart: "2026-12-07" });
     expect((w.value as WeekView).lessons.find((l) => l.weekday === 1 && l.periodId === p1.id)).toMatchObject({ cancelled: false, changed: false, subject: "國語" });
+  });
+});
+
+describe("MCP 聯絡簿", () => {
+  async function setupDiary() {
+    const c = await login(FIRST_TEACHER);
+    const g = await ok(api<Group>(c, "POST", "/api/groups", { name: "MCP 聯絡簿組" }));
+    const s = await ok(api<Student>(c, "POST", "/api/students", { displayName: "不該給 agent 的名字", groupIds: [g.id] }));
+    const k = await newKey(c, "聯絡簿助手");
+    return { c, g, s, k };
+  }
+  const entry = (d: DiaryDay, groupId: string) => d.entries.find((e) => e.groupId === groupId)!;
+
+  it("agent 草擬只會是草稿，記下是哪把金鑰；老師按發送才生效", async () => {
+    const { c, g, k } = await setupDiary();
+    const r = await tool(k.key, "draft_contact_book", { date: "2026-12-09", groupId: g.id, homework: "習作 p.40", bring: "直笛", note: "明天考聽寫", status: "sent" });
+    expect(r.isError).toBe(false);
+    const d = await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-09"));
+    expect(entry(d, g.id)).toMatchObject({ status: "draft", homework: "習作 p.40", bring: "直笛", note: "明天考聽寫", updatedBy: "agent：聯絡簿助手", sentAt: null });
+    await ok(api<DiaryEntry>(c, "PUT", "/api/diary", { date: "2026-12-09", groupId: g.id, homework: "習作 p.40", bring: "直笛", note: "明天考聽寫", status: "sent" }));
+    expect(entry(await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-09")), g.id).status).toBe("sent");
+  });
+
+  it("agent 沒給的欄位不變，也不會動到個別加註", async () => {
+    const { c, g, s, k } = await setupDiary();
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-10", groupId: g.id, homework: "老師寫的", status: "draft", studentNotes: [{ studentId: s.id, text: "加油" }] }));
+    await tool(k.key, "draft_contact_book", { date: "2026-12-10", groupId: g.id, note: "agent 補備註", studentNotes: [] });
+    const e = entry(await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-10")), g.id);
+    expect(e).toMatchObject({ homework: "老師寫的", note: "agent 補備註", status: "draft" });
+    expect(e.studentNotes).toEqual([{ studentId: s.id, text: "加油" }]);
+  });
+
+  it("agent 不能改已發送的聯絡簿", async () => {
+    const { c, g, k } = await setupDiary();
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-11", groupId: g.id, homework: "已發送", status: "sent" }));
+    const r = await tool(k.key, "draft_contact_book", { date: "2026-12-11", groupId: g.id, homework: "agent 想改" });
+    expect(r.isError).toBe(true);
+    expect(entry(await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-11")), g.id)).toMatchObject({ homework: "已發送", status: "sent" });
+  });
+
+  it("agent 讀某一天時看不到個別加註、學生名字與老師信箱，有課表帶入的建議與組名", async () => {
+    const { c, g, s, k } = await setupDiary();
+    await ok(api(c, "PUT", "/api/diary", { date: "2026-12-14", groupId: g.id, homework: "老師寫的", status: "sent", studentNotes: [{ studentId: s.id, text: "私下的加註" }] }));
+    const r = await tool(k.key, "get_contact_book", { date: "2026-12-14" });
+    expect(r.isError).toBe(false);
+    expect(r.text).not.toContain("私下的加註");
+    expect(r.text).not.toContain("不該給 agent 的名字");
+    expect(r.text).not.toContain(s.id);
+    expect(r.text).not.toContain(FIRST_TEACHER);
+    const e = r.value.entries.find((x: { groupId: string }) => x.groupId === g.id);
+    expect(e).toMatchObject({ groupName: "MCP 聯絡簿組", homework: "老師寫的", status: "sent", updatedBy: "老師" });
+    expect(e.suggested).toEqual({ homework: "", bring: "" });
+    expect("studentNotes" in e).toBe(false);
+  });
+
+  it("日期或組別錯誤時回錯誤", async () => {
+    const { g, k } = await setupDiary();
+    expect((await tool(k.key, "get_contact_book", { date: "12/14" })).isError).toBe(true);
+    expect((await tool(k.key, "draft_contact_book", { date: "2026-12-14", groupId: "nope", homework: "x" })).isError).toBe(true);
+    expect((await tool(k.key, "draft_contact_book", { date: "2026-12-14", groupId: g.id, homework: "x".repeat(501) })).isError).toBe(true);
   });
 });
