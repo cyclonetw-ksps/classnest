@@ -50,10 +50,12 @@ export function bellKey(b: Bell): string {
 export const STALE_MS = 5_000;
 
 // 進入上課或離開上課的那一刻響；第一次打開（沒有上一個狀態）不響。
-// gapMs 是這次和上一次更新畫面相隔多久，太久代表那一刻早就過了
-export function bellChimes(prev: string | null, next: string, gapMs = 0): boolean {
+// gapMs 是這次和上一次更新畫面相隔多久，太久代表那一刻早就過了。
+// cancelled 是今天停課的節次 id：停課的節上下課不響（學生不用進教室），相接的兩節只要有一節照常上課就響
+export function bellChimes(prev: string | null, next: string, gapMs = 0, cancelled: string[] = []): boolean {
   if (prev === null || prev === next || gapMs > STALE_MS) return false;
-  return prev.startsWith("class:") || next.startsWith("class:");
+  const classes = [prev, next].filter((k) => k.startsWith("class:")).map((k) => k.slice("class:".length));
+  return classes.some((id) => !cancelled.includes(id));
 }
 
 // 課表上要標「現在這一節」的節次 id；不在上課中（下課、放學、週末）就是 null
