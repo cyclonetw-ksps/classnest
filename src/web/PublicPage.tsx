@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
-import type { PublicView } from "../shared/types";
+import type { PublicDiary, PublicView } from "../shared/types";
+import { weekdayOf, WEEKDAY_NAMES } from "../shared/week";
 import { ApiError, getConfig, request } from "./api";
+import { DiaryLines } from "./diary-lines";
 import { boardPaper, Note } from "./notes";
 import { paperAt } from "./palette";
 
@@ -153,8 +155,9 @@ export function PublicPage({ code }: { code: string }) {
             })}
           </div>
         )}
+        {view.diary.length > 0 && <PublicDiaryList diary={view.diary} colorOf={colorOf} groupName={groupName} />}
         {view.boards.length === 0 ? (
-          <p class="empty">老師還沒有分享內容{group ? "給這一組" : ""}。</p>
+          view.diary.length === 0 && <p class="empty">老師還沒有分享內容{group ? "給這一組" : ""}。</p>
         ) : (
           <ol class="boards">
             {view.boards.map((b) => (
@@ -182,5 +185,34 @@ export function PublicPage({ code }: { code: string }) {
         )}
       </main>
     </div>
+  );
+}
+
+// 聯絡簿：一天一段（新的在前），每組一張紙；沒有個別加註，也沒有是誰寫的
+function PublicDiaryList(props: { diary: PublicDiary[]; colorOf: (id: string) => number; groupName: (id: string) => string }) {
+  const dates = [...new Set(props.diary.map((d) => d.date))];
+  return (
+    <section class="pub-diary" aria-labelledby="pub-diary-title">
+      <h2 id="pub-diary-title">聯絡簿</h2>
+      {dates.map((date) => (
+        <div key={date} class="pub-diary-day">
+          <h3>
+            {WEEKDAY_NAMES[weekdayOf(date)] ?? ""} {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}
+          </h3>
+          <ol class="diary-list">
+            {props.diary
+              .filter((d) => d.date === date)
+              .map((d) => (
+                <li key={d.groupId} class="diary-entry" style={{ "--paper": paperAt(props.colorOf(d.groupId)).hue }}>
+                  <div class="diary-head">
+                    <h4 class="diary-group">{props.groupName(d.groupId)}</h4>
+                  </div>
+                  <DiaryLines homework={d.homework} bring={d.bring} note={d.note} />
+                </li>
+              ))}
+          </ol>
+        </div>
+      ))}
+    </section>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "preact/hooks";
 import type { ClassState } from "../shared/types";
 import { ApiError, getConfig, getState, logout } from "./api";
 import { BoardPanel } from "./BoardPanel";
+import { DiaryPanel } from "./DiaryPanel";
 import { Login } from "./Login";
 import { PointsPanel } from "./PointsPanel";
 import { ReasonsPanel, RewardsPanel } from "./RewardsPanel";
@@ -16,6 +17,7 @@ const TABS = [
   { id: "points", label: "加分" },
   { id: "board", label: "公布欄" },
   { id: "schedule", label: "課表" },
+  { id: "diary", label: "聯絡簿" },
   { id: "screen", label: "大螢幕" },
   { id: "students", label: "學生" },
   { id: "groups", label: "組別" },
@@ -132,6 +134,7 @@ export function App() {
         {tab === "points" && <PointsPanel state={state} act={act} />}
         {tab === "board" && <BoardPanel state={state} act={act} />}
         {tab === "schedule" && <SchedulePanel state={state} act={act} />}
+        {tab === "diary" && <DiaryPanel state={state} act={act} />}
         {/* 大螢幕一直掛著，切到其他分頁時計時與提示音照常 */}
         <ScreenPanel hidden={tab !== "screen"} state={state} />
         {tab === "students" && <StudentsPanel state={state} act={act} />}

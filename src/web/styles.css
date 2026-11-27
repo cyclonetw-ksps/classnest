@@ -784,3 +784,64 @@ input.has-error { border-color: var(--danger); background: var(--danger-soft); }
   background: radial-gradient(circle at 35% 32%, rgb(255 255 255 / 0.65) 0 2px, transparent 2.5px), var(--paper-sun);
   box-shadow: var(--shadow-pin);
 }
+
+/* ---------- 聯絡簿 ---------- */
+/* 一組一張紙：頂端是該組色紙的波浪滾邊（和公布欄標題紙同一種），內容是作業、要帶、備註三行 */
+.diary .week-nav .btn { white-space: nowrap; }
+.diary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 700px) { .diary-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .diary-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.diary-entry {
+  --paper: var(--line-strong);
+  position: relative; display: grid; gap: 10px; align-content: start; min-width: 0;
+  padding: 26px 16px 14px; border-radius: 4px 4px var(--r) var(--r); background: var(--card); box-shadow: var(--shadow);
+}
+.diary-entry::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 14px; border-radius: 4px 4px 0 0; background: var(--paper);
+  mask: radial-gradient(circle at 8px 14px, transparent 6.5px, var(--mask-ink) 7px) 0 0 / 16px 14px repeat-x;
+}
+/* 還沒寫：沒有釘上去的紙，只有虛線框（滾邊淡淡留著，看得出是哪一組） */
+.diary-entry.is-empty { background: transparent; box-shadow: none; outline: 1.5px dashed var(--line-strong); outline-offset: -1.5px; }
+.diary-entry.is-empty::before { opacity: 0.45; }
+.diary-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
+.sheet .diary-head h3, .sheet .diary-head h4 { margin: 0; font-family: var(--display); font-weight: 400; font-size: var(--fs-subhead); overflow-wrap: anywhere; }
+/* 已發送：實心草綠＋勾；草稿：墨色虛線框。形狀不同，不只靠顏色 */
+.tag-sent { background: var(--paper-grass); border-color: var(--paper-grass); color: var(--on-grass); font-variant-numeric: tabular-nums; }
+.tag-draft { border-style: dashed; border-color: var(--ink); color: var(--ink); }
+.diary-lines { display: grid; gap: 8px; margin: 0; }
+.diary-lines > div { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.diary-lines dt { font-weight: 700; font-size: var(--fs-small); color: var(--muted); }
+.diary-lines dt .due { color: color-mix(in srgb, var(--paper-red) 55%, var(--ink)); }
+.diary-lines dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.55; }
+.diary-suggest { display: grid; gap: 6px; color: var(--muted); }
+.diary-suggest .diary-lines dd { color: var(--muted); }
+.diary-suggest-title, .diary-blank { margin: 0; color: var(--muted); font-size: var(--fs-small); }
+.diary-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; color: var(--muted); font-size: var(--fs-small); }
+.diary-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
+.diary-actions .copy { display: inline-flex; gap: 8px; align-items: center; }
+.diary-send { display: inline-flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: flex-end; }
+/* 每位學生一列：名字、輸入框、（已發送且有加註時）複製鈕。用 subgrid 讓每一列的輸入框一樣寬 */
+.diary-notes { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(4.5em, max-content) minmax(0, 1fr) 46px; align-items: center; }
+.diary-notes li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; gap: 6px 10px; align-items: center; }
+.diary-notes label { grid-column: 1; font-weight: 700; overflow-wrap: anywhere; }
+.diary-notes input { grid-column: 2; }
+.diary-notes .copy { grid-column: 3; }
+.diary-notes .copy-tip { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 480px) {
+  .diary-notes { grid-template-columns: minmax(0, 1fr) 46px; }
+  .diary-notes label { grid-column: 1 / -1; }
+  .diary-notes input { grid-column: 1; }
+  .diary-notes .copy { grid-column: 2; }
+}
+.diary-refill { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 0 0 10px; }
+/* 作業與備註的輸入框跟著內容長高（Modern Web Guidance：form-fields-automatically-fit-contents） */
+textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-block-size: 12lh; }
+
+/* 分享頁的聯絡簿：一天一段，日期在上，下面是各組的紙；字給學生與家長看，大一點 */
+.pub-diary { display: grid; gap: 14px; margin-bottom: 36px; }
+.sheet .pub-diary > h2 { margin: 0; }
+.pub-diary-day { display: grid; gap: 12px; }
+.sheet .pub-diary-day h3 { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.pub-diary .diary-list { gap: 16px; }
+.pub-diary .diary-lines dd { font-size: 1.1rem; line-height: 1.7; }
+.pub-diary .diary-lines dt { font-size: 1rem; }

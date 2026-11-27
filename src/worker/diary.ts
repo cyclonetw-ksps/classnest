@@ -188,15 +188,21 @@ export class DiaryStore {
 
   // 已發送的；有選組就只看那一組。取最近幾個有發送的日期，新的在前
   published(group: string): PublicDiary[] {
-    const order = new Map(this.activeGroups().map((g, i) => [g.id, i]));
-    const rows = this.sql
-      .exec<Row>("SELECT * FROM diary WHERE status = 'sent' ORDER BY date DESC")
+    // 只看使用中的組；先找最近幾個有發送的日期，再讀那幾天的內容（不把整學期的資料都讀出來）
+    const scope = `FROM diary d JOIN class_groups g ON g.id = d.group_id WHERE d.status = 'sent' AND g.active = 1${group ? " AND d.group_id = ?" : ""}`;
+    const args = group ? [group] : [];
+    const dates = this.sql
+      .exec<{ date: string }>(`SELECT DISTINCT d.date AS date ${scope} ORDER BY d.date DESC LIMIT ${LIMITS.publicDiaryDays}`, ...args)
       .toArray()
-      .filter((r) => order.has(r.group_id) && (!group || r.group_id === group));
-    const dates = [...new Set(rows.map((r) => r.date))].slice(0, LIMITS.publicDiaryDays);
-    return rows
-      .filter((r) => dates.includes(r.date))
-      .sort((a, b) => (a.date === b.date ? order.get(a.group_id)! - order.get(b.group_id)! : a.date < b.date ? 1 : -1))
+      .map((r) => r.date);
+    if (!dates.length) return [];
+    return this.sql
+      .exec<Row>(
+        `SELECT d.* ${scope} AND d.date IN (${dates.map(() => "?").join(", ")}) ORDER BY d.date DESC, g.created_at, g.rowid`,
+        ...args,
+        ...dates,
+      )
+      .toArray()
       .map((r) => ({ date: r.date, groupId: r.group_id, homework: r.homework, bring: r.bring, note: r.note }));
   }
 
