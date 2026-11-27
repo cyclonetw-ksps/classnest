@@ -309,8 +309,10 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
   // 組別色小方塊永遠跟著組別（停課也一樣），沒有組別就不畫
   const swatch = lesson ? groupHue(lesson.groupId) : null;
   const lessonText = lesson ? [groupName(lesson.groupId), lesson.subject].filter((x, i, a) => x && a.indexOf(x) === i).join("・") : "";
-  const stageClass = ["stage", checkinOpen && "checking", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
-  const label = bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
+  // 沒在計時、只開放簽到時：舞台讓給簽到名牌，不放空鐘面
+  const checkinOnly = checkinOpen && idle;
+  const stageClass = ["stage", checkinOpen && "checking", checkinOnly && "checkin-only", !scheduling && done && "done", !scheduling && run?.paused != null && "paused", idle && "idle", scheduling && "bell"].filter(Boolean).join(" ");
+  const label = checkinOnly ? "簽到" : bell ? bellLabel(bell, known) : run ? run.label : "還沒開始計時";
 
   return (
     <section aria-labelledby="screen-title" class="screen" hidden={hidden}>
@@ -362,7 +364,8 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
             ) : (
               <>
                 <p class="meta phrases">
-                  <span>學生在學生平板登入後按「簽到」，</span>
+                  <span>學生在學生平板登入後</span>
+                  <span>按「我來了，簽到」，</span>
                   <span>大螢幕會列出已簽到的人。</span>
                 </p>
                 <div class="form-actions start">
@@ -384,10 +387,10 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                   <ul class="rows compact checkin-rows">
                     {checkin.checkins.map((c) => (
                       <li key={c.id}>
-                        <div class="row-main">
+                        <span class="checkin-who">
                           <strong>{c.displayName}</strong>
                           <span class="meta">{clockOf(c.at)}</span>
-                        </div>
+                        </span>
                         <button class="btn quiet small" type="button" onClick={() => checkinAction(`checkins/${c.id}/undo`, undefined, `已撤銷 ${c.displayName} 的簽到`)} aria-label={`撤銷 ${c.displayName} 的簽到`}>
                           撤銷
                         </button>
@@ -555,7 +558,7 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                   <span class="stage-checkin-count">已簽到 {checkin.checkins.length} 人</span>
                 </p>
                 {checkin.checkins.length > 0 ? (
-                  <ul class="stage-names" aria-label="已簽到">
+                  <ul class={`stage-names${checkin.checkins.length > 12 ? " many" : ""}`} aria-label="已簽到">
                     {checkin.checkins.map((c) => (
                       <li key={c.id} class="stage-name">
                         <span class="pin drop" aria-hidden="true" />
@@ -564,7 +567,10 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
                     ))}
                   </ul>
                 ) : (
-                  <p class="stage-note">在學生平板上點自己的名字、登入後按「簽到」。</p>
+                  <p class="stage-note phrases">
+                    <span>在學生平板上點自己的名字，</span>
+                    <span>登入後按「我來了，簽到」。</span>
+                  </p>
                 )}
               </div>
             )}

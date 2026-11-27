@@ -1033,18 +1033,32 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 .stage-checkin { display: grid; gap: 1.4cqh; justify-items: center; min-width: 0; }
 .stage-checkin-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: center; margin: 0; }
 .stage-checkin-count { font-family: var(--display); font-size: clamp(1rem, min(2.6cqw, 4cqh), 2rem); color: var(--felt-muted); font-variant-numeric: tabular-nums; }
-.stage-names { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.2cqh 1.4cqw; max-height: 22cqh; overflow: hidden; }
+.stage-names { list-style: none; margin: 0; padding: 0.5em 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6cqh 1.4cqw; }
+/* 白紙名牌，上緣正中釘一枚圖釘 */
 .stage-name {
-  display: inline-flex; gap: 0.4em; align-items: center; padding: 0.25em 0.7em 0.25em 0.5em; border-radius: var(--r-tag);
+  position: relative; padding: 0.35em 0.75em 0.25em; border-radius: var(--r-tag);
   background: #ffffff; color: #1d2a30; box-shadow: var(--shadow); font-weight: 700; font-size: clamp(1rem, min(2.6cqw, 4.2cqh), 2.2rem); line-height: 1.3;
 }
-.stage-name .pin { width: 0.6em; height: 0.6em; flex: none; }
+.stage-name .pin { position: absolute; top: -0.3em; left: 50%; margin-left: -0.3em; width: 0.6em; height: 0.6em; }
+.stage-names.many .stage-name { font-size: clamp(0.9rem, min(1.9cqw, 3.2cqh), 1.6rem); }
+/* 只開放簽到、沒在計時：拿掉空鐘面，名牌是主角 */
+.stage.checkin-only .stage-body { display: none; }
+.stage.checkin-only .stage-inner { grid-template-rows: auto minmax(0, 1fr) auto; }
+.stage.checkin-only .stage-checkin { align-content: center; gap: 4cqh; }
+.stage.checkin-only .stage-label { color: var(--felt-ink); }
+.stage.checkin-only .stage-name { font-size: clamp(1.3rem, min(4.4cqw, 7cqh), 4rem); }
+.stage.checkin-only .stage-names.many .stage-name { font-size: clamp(1.1rem, min(3cqw, 4.6cqh), 2.6rem); }
+.stage.checkin-only .stage-note { font-size: clamp(1.2rem, min(3cqw, 4.6cqh), 2.4rem); max-width: none; }
 .stage-name:nth-child(3n + 1) { rotate: -1deg; }
 .stage-name:nth-child(3n + 2) { rotate: 0.8deg; }
 /* 老師端的簽到小節 */
 .checkin-block .bell-on { margin-bottom: 8px; }
 .checkin-count { margin: 12px 0 6px; font-weight: 700; }
-.checkin-rows { box-shadow: none; border: 1px solid var(--line); }
+/* 紙卡裡的小列：不另外套框，只有列與列之間的分隔線；名字、時間、撤銷同一行 */
+.checkin-rows { background: transparent; box-shadow: none; border-radius: 0; border-top: 1px solid var(--line); }
+.checkin-rows li { padding: 4px 0; flex-wrap: nowrap; }
+.checkin-who { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.checkin-who strong { overflow-wrap: anywhere; }
 /* 學生頁：老師開放簽到時最上面一顆大按鈕；簽好後是草綠實線加勾 */
 .checkin-cta { display: grid; gap: 6px; }
 .checkin-btn { min-block-size: 80px; font-family: var(--display); font-weight: 400; font-size: clamp(1.5rem, 4.4vw, 2rem); border-radius: var(--r); box-shadow: var(--shadow); }
