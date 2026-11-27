@@ -854,3 +854,147 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 .pub-diary .diary-list { gap: 16px; }
 .pub-diary .diary-lines dd { font-size: 1.1rem; line-height: 1.7; }
 .pub-diary .diary-lines dt { font-size: 1rem; }
+
+/* ---------- 學生平板（/student） ---------- */
+/* 給一到六年級：字大、按鈕大、一步只做一件事。圖卡深淺色模式都畫在白紙上 */
+.kiosk.shell { max-width: 62rem; }
+.kiosk-step { display: grid; gap: 18px; align-content: start; }
+.kiosk h2 { font-family: var(--display); font-weight: 400; font-size: clamp(1.6rem, 4.4vw, 2.2rem); line-height: 1.25; text-wrap: balance; }
+.kiosk-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.kiosk-head .btn { flex: none; }
+.kiosk-me { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.kiosk-me h2 { overflow-wrap: anywhere; }
+
+.kiosk-groups { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); }
+.kiosk-groups li { display: grid; }
+.kiosk-groups li:nth-child(3n + 1) .kiosk-group-btn { rotate: -0.5deg; }
+.kiosk-groups li:nth-child(3n + 2) .kiosk-group-btn { rotate: 0.35deg; }
+.kiosk-group-btn {
+  min-block-size: 96px; padding: 18px 16px; border: 0; border-radius: 4px 4px var(--r) var(--r);
+  background: var(--paper); color: var(--on-paper); box-shadow: var(--shadow); cursor: pointer;
+  font-family: var(--display); font-size: clamp(1.4rem, 3.6vw, 1.8rem); line-height: 1.25; overflow-wrap: anywhere;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.kiosk-group { justify-self: start; margin: 0; padding: 4px 14px; border-radius: var(--r-label); background: var(--paper); color: var(--on-paper); font-weight: 700; font-size: 1.1rem; }
+
+.kids { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+.kids li { display: grid; }
+.kid {
+  display: grid; gap: 10px; justify-items: center; align-content: center; padding: 20px 10px 16px; min-block-size: 9.5rem;
+  border: 0; border-radius: var(--r); background: var(--card); color: var(--ink); box-shadow: var(--shadow); cursor: pointer;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.kid-name { font-weight: 700; font-size: 1.25rem; line-height: 1.3; overflow-wrap: anywhere; text-align: center; }
+/* 還沒有圖卡密碼：沒有釘上去的虛線紙，寫出原因（不只靠淡化） */
+.kid.not-ready { background: transparent; box-shadow: none; outline: 1.5px dashed color-mix(in srgb, var(--line-strong) 45%, var(--muted)); outline-offset: -1.5px; cursor: default; }
+.kid.not-ready .avatar { background: transparent; color: var(--muted); outline: 2px dashed var(--line-strong); outline-offset: -2px; box-shadow: none; }
+.kid-note { font-size: var(--fs-small); color: var(--muted); text-align: center; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .kiosk-group-btn:hover, .kid:not(:disabled):hover { transform: translateY(-2px) rotate(-0.4deg); box-shadow: var(--shadow-lift); }
+}
+
+.avatar {
+  display: inline-grid; place-items: center; flex: none; width: 64px; aspect-ratio: 1; border-radius: 50%;
+  background: var(--paper); color: var(--on-paper); font-family: var(--display); font-size: 2rem; line-height: 1;
+  box-shadow: var(--shadow-pin);
+}
+.avatar.big { width: 84px; font-size: 2.7rem; }
+
+.kiosk-ask { font-family: var(--display); font-size: clamp(1.3rem, 3.4vw, 1.6rem); margin: 0; }
+.slots { list-style: none; margin: 0; padding: 0; display: flex; gap: 12px; }
+.slots li {
+  display: grid; place-items: center; width: 68px; aspect-ratio: 1; border-radius: 12px;
+  border: 2px dashed var(--line-strong); background: transparent;
+}
+.slots li.filled { border: 2px solid #c9c1ae; background: #ffffff; box-shadow: var(--shadow); }
+.slots .card-pic { width: 46px; }
+.slot-no { font-family: var(--display); font-size: 1.5rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .slots[data-shake] { animation: slots-shake 0.4s var(--ease-out); }
+}
+@keyframes slots-shake {
+  20% { translate: -8px 0; } 40% { translate: 7px 0; } 60% { translate: -4px 0; } 80% { translate: 2px 0; }
+}
+.kiosk-msg { min-height: 1.6em; margin: 0; font-size: 1.15rem; color: var(--muted); }
+.kiosk-msg.error { color: var(--danger); font-weight: 700; }
+
+.pic-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 36rem; }
+.pic-grid li { display: grid; }
+.pic {
+  display: grid; gap: 4px; justify-items: center; padding: 12px 8px 10px; border-radius: var(--r); cursor: pointer;
+  border: 2px solid #e6e0d2; background: #ffffff; color: #1d2a30; box-shadow: var(--shadow);
+  font-size: 1.1rem; font-weight: 700; touch-action: manipulation;
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+.pic .card-pic { width: min(72%, 88px); }
+.pic:active:not(:disabled) { transform: scale(0.96); }
+/* 已經點過的那張：虛線框、淡掉，旁邊的格子看得出它已經在上面 */
+.pic[aria-pressed="true"] { border-style: dashed; border-color: #8a7f6e; box-shadow: none; }
+.pic[aria-pressed="true"] .card-pic { opacity: 0.3; }
+.pic:disabled:not([aria-pressed="true"]) { cursor: default; box-shadow: none; }
+.kiosk-foot { display: flex; }
+
+/* 學生自己的頁面 */
+.kiosk .sheet.me { gap: 28px; }
+.me-card {
+  position: relative; display: grid; gap: 14px; padding: 32px clamp(18px, 4vw, 28px) 24px;
+  border-radius: 4px 4px var(--r) var(--r); background: var(--card); box-shadow: var(--shadow);
+}
+.me-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 14px; border-radius: 4px 4px 0 0; background: var(--paper);
+  mask: radial-gradient(circle at 8px 14px, transparent 6.5px, var(--mask-ink) 7px) 0 0 / 16px 14px repeat-x;
+}
+.me-who { display: flex; gap: 16px; align-items: center; min-width: 0; }
+.me-who h2 { overflow-wrap: anywhere; }
+.me-total { margin: 0; font-family: var(--display); font-size: clamp(3.6rem, 12vw, 5.5rem); line-height: 1; font-variant-numeric: tabular-nums; }
+.me-total small { font-family: var(--text); font-size: 1.2rem; color: var(--muted); margin-left: 6px; }
+.me-next { display: grid; gap: 8px; margin: 0; font-size: 1.15rem; line-height: 1.5; }
+.me-next b { font-family: var(--display); font-weight: 400; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.me-next progress {
+  --progress-bar-radius: 1e5px;
+  appearance: none; inline-size: 100%; block-size: 18px; border: 0; border-radius: var(--progress-bar-radius);
+  background: color-mix(in srgb, var(--line) 70%, var(--sheet)); box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.12);
+}
+.me-next progress::-webkit-progress-bar { background: transparent; }
+.me-next progress::-webkit-progress-value { background: var(--paper-sun); border-radius: var(--progress-bar-radius); }
+.me-next progress::-moz-progress-bar { background: var(--paper-sun); border-radius: var(--progress-bar-radius); }
+.me-rewards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.me-rewards .ribbon { white-space: normal; font-size: 1.05rem; padding: 6px 12px; }
+.me-rewards .ribbon svg { width: 18px; height: 18px; }
+.kiosk .diary-head .pub-diary-date { font-weight: 700; color: var(--muted); }
+.my-note { display: grid; gap: 2px; margin: 0; padding: 10px 14px; border-radius: 10px; border: 2px dashed var(--paper-sun); font-size: 1.1rem; line-height: 1.7; overflow-wrap: anywhere; }
+.my-note b { font-size: var(--fs-small); }
+.kiosk .diary-lines { font-size: 1.1rem; line-height: 1.7; }
+.kiosk-hint { margin: 0; justify-self: center; text-align: center; text-wrap: balance; }
+/* 換人／登出在頂欄：白框，學生一眼找得到 */
+.kiosk .top .btn.ghost { border-color: rgb(255 255 255 / 0.7); }
+
+/* ---------- 圖卡密碼（老師看、印） ---------- */
+.card-pic { display: block; width: 100%; height: auto; }
+.card-seq { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 6.5rem)); gap: 12px; }
+.card-seq li {
+  position: relative; display: grid; gap: 2px; justify-items: center; min-width: 0; padding: 14px 8px 8px;
+  border-radius: 14px; border: 2px solid #e6e0d2; background: #ffffff; color: #1d2a30; font-weight: 700;
+}
+.card-seq .card-pic { width: 64%; }
+.seq-no {
+  position: absolute; top: -10px; left: -8px; display: grid; place-items: center; width: 30px; aspect-ratio: 1; border-radius: 50%;
+  background: var(--felt); color: #ffffff; font-family: var(--display); font-size: 1.1rem; box-shadow: var(--shadow-pin);
+}
+.print-page { max-width: 62rem; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); background: var(--sheet); min-height: 100vh; display: grid; gap: 20px; align-content: start; }
+.print-head { display: grid; gap: 8px; justify-items: start; }
+.print-head h1 { font-family: var(--display); font-weight: 400; font-size: clamp(1.5rem, 4vw, 2rem); }
+.print-head .hint { margin: 0; }
+.print-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+/* 一位學生一張剪下來的紙條：虛線是剪裁線，頂端一條組別色 */
+.print-slip { display: grid; gap: 14px; padding: 20px 16px 18px; border: 1.5px dashed var(--line-strong); box-shadow: inset 0 6px 0 var(--paper); break-inside: avoid; }
+.slip-name { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0; }
+.slip-name b { font-size: 1.25rem; }
+@media print {
+  .print-page { padding: 0; background: #ffffff; min-height: 0; }
+  .print-head .btn { display: none; }
+  .print-slip { border-color: #8a7f6e; }
+}
+/* 小節標題旁邊有按鈕時（例如學生平板）：間距放在整列，標題與按鈕對齊 */
+.section-head:has(> h3) { margin-top: 28px; }
+.section-head > h3 { margin: 0; }

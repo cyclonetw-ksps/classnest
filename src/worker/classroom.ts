@@ -714,7 +714,7 @@ export class ClassroomDO extends DurableObject<Env> {
       rewards: this.rewards()
         .filter((w) => w.active)
         .map((w) => ({ id: w.id, title: w.title, threshold: w.threshold, unlocked: total >= w.threshold, granted: granted.has(w.id) })),
-      diary: this.diary.forStudent(studentId),
+      diary: this.diary.forStudent(studentId).map((d) => ({ ...d, color: colors.get(d.groupId) ?? -1 })),
     };
   }
 

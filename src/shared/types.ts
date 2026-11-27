@@ -88,7 +88,7 @@ export interface StudentView {
   color: number;
   total: number;
   rewards: { id: string; title: string; threshold: number; unlocked: boolean; granted: boolean }[];
-  diary: { date: string; groupId: string; groupName: string; homework: string; bring: string; note: string; myNote: string }[];
+  diary: { date: string; groupId: string; groupName: string; color: number; homework: string; bring: string; note: string; myNote: string }[];
 }
 
 export interface PointEvent {

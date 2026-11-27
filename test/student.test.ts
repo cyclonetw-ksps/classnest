@@ -222,8 +222,9 @@ describe("學生頁", () => {
     const { device } = await enroll(await login(FIRST_TEACHER));
     const { cookie } = await studentLogin(device, s1.id, cards);
     const me = await ok(api<StudentView>(both(device, cookie), "GET", "/api/student/me"));
+    const color = (await state(c)).groups.findIndex((g) => g.id === g1.id);
     expect(me.diary).toEqual([
-      { date: "2026-12-02", groupId: g1.id, groupName: "登入 A 組", homework: "習作 p.10", bring: "直笛", note: "", myNote: "給小明的話" },
+      { date: "2026-12-02", groupId: g1.id, groupName: "登入 A 組", color, homework: "習作 p.10", bring: "直笛", note: "", myNote: "給小明的話" },
     ]);
     const raw = JSON.stringify(me);
     expect(raw).not.toContain("給小華的悄悄話");

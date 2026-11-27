@@ -1,7 +1,8 @@
 import { useState } from "preact/hooks";
-import { LIMITS, type ClassState, type Group, type Student } from "../shared/types";
-import { request } from "./api";
+import { LIMITS, type ClassState, type Group, type LoginCards, type Student } from "../shared/types";
+import { ApiError, request } from "./api";
 import type { Act } from "./App";
+import { cardName, CardPicture } from "./cards";
 import { Dialog } from "./Dialog";
 import { paperAt } from "./palette";
 
@@ -10,7 +11,28 @@ const empty: Draft = { displayName: "", homeClass: "", homeroomTeacher: "", grou
 
 export function StudentsPanel({ state, act }: { state: ClassState; act: Act }) {
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [cards, setCards] = useState<{ student: Student; cards: number[] | null; confirm: boolean; error: string } | null>(null);
   const groupName = (id: string) => state.groups.find((g) => g.id === id)?.name ?? "";
+
+  // 看圖卡密碼：已經有的從「印圖卡密碼」的清單找；沒有的先顯示產生按鈕
+  async function openCards(s: Student) {
+    setCards({ student: s, cards: null, confirm: false, error: "" });
+    if (!s.hasCards) return;
+    try {
+      const list = await request<LoginCards[]>("GET", "login-cards");
+      setCards({ student: s, cards: list.find((x) => x.studentId === s.id)?.cards ?? null, confirm: false, error: "" });
+    } catch (err) {
+      setCards({ student: s, cards: null, confirm: false, error: err instanceof ApiError ? err.message : "連線出了問題，請稍後再試" });
+    }
+  }
+
+  async function generate(s: Student) {
+    let fresh: number[] | null = null;
+    const done = await act(async () => {
+      fresh = (await request<{ cards: number[] }>("POST", `students/${s.id}/cards`)).cards;
+    }, `已產生 ${s.displayName} 的圖卡密碼`);
+    if (done) setCards({ student: { ...s, hasCards: true }, cards: fresh, confirm: false, error: "" });
+  }
 
   async function save(e: Event) {
     e.preventDefault();
@@ -30,9 +52,16 @@ export function StudentsPanel({ state, act }: { state: ClassState; act: Act }) {
     <section aria-labelledby="students-title">
       <div class="section-head">
         <h2 id="students-title">學生</h2>
-        <button class="btn primary" onClick={() => setDraft({ ...empty })}>
-          新增學生
-        </button>
+        <div class="row-actions">
+          {state.students.some((s) => s.active && s.hasCards) && (
+            <a class="btn" href="/cards" target="_blank" rel="noopener">
+              印圖卡密碼
+            </a>
+          )}
+          <button class="btn primary" onClick={() => setDraft({ ...empty })}>
+            新增學生
+          </button>
+        </div>
       </div>
       <p class="hint">只存顯示名、原班、導師稱呼與組別。顯示名可以用小名或「王〇明」。</p>
       {state.students.length === 0 ? (
@@ -47,9 +76,15 @@ export function StudentsPanel({ state, act }: { state: ClassState; act: Act }) {
                   {[s.homeClass, s.homeroomTeacher].filter(Boolean).join("・")}
                   {s.groupIds.length > 0 && `｜${s.groupIds.map(groupName).join("、")}`}
                   {!s.active && "｜已停用"}
+                  {s.active && !s.hasCards && "｜還沒有圖卡密碼"}
                 </span>
               </div>
               <div class="row-actions">
+                {s.active && (
+                  <button class="btn small" onClick={() => openCards(s)} aria-label={`${s.displayName} 的圖卡密碼`}>
+                    圖卡密碼
+                  </button>
+                )}
                 <button class="btn small" onClick={() => edit(s)} aria-label={`編輯 ${s.displayName}`}>
                   編輯
                 </button>
@@ -65,6 +100,53 @@ export function StudentsPanel({ state, act }: { state: ClassState; act: Act }) {
           ))}
         </ul>
       )}
+
+      <Dialog open={cards !== null} title={cards ? `${cards.student.displayName} 的圖卡密碼` : ""} onClose={() => setCards(null)}>
+        {cards && (
+          <div class="form">
+            {cards.error && <p class="login-msg error">{cards.error}</p>}
+            {cards.cards ? (
+              <>
+                <p class="hint">學生在學生平板上點自己的名字後，依照順序點這 3 張圖卡。</p>
+                <ol class="card-seq">
+                  {cards.cards.map((c, i) => (
+                    <li key={i}>
+                      <span class="seq-no">{i + 1}</span>
+                      <CardPicture index={c} />
+                      <span>{cardName(c)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            ) : (
+              !cards.student.hasCards && <p class="hint">還沒有圖卡密碼。產生之後，就可以在學生平板上登入。</p>
+            )}
+            {cards.confirm ? (
+              <div class="form-actions spread">
+                <p class="meta">重新產生後，舊的圖卡順序就不能用了。</p>
+                <button class="btn" onClick={() => setCards({ ...cards, confirm: false })}>
+                  取消
+                </button>
+                <button class="btn danger" onClick={() => generate(cards.student)}>
+                  確定重新產生
+                </button>
+              </div>
+            ) : (
+              <div class="form-actions">
+                {cards.student.hasCards ? (
+                  <button class="btn quiet" onClick={() => setCards({ ...cards, confirm: true })}>
+                    重新產生
+                  </button>
+                ) : (
+                  <button class="btn primary" onClick={() => generate(cards.student)}>
+                    產生圖卡密碼
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
 
       <Dialog open={draft !== null} title={draft?.id ? "編輯學生" : "新增學生"} onClose={() => setDraft(null)}>
         {draft && (

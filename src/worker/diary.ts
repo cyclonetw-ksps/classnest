@@ -220,7 +220,7 @@ export class DiaryStore {
   /* ---------- 學生頁 ---------- */
 
   // 學生所屬的使用中組別，各取最近一次已發送的一則；個別加註只給這位學生自己的
-  forStudent(studentId: string): StudentView["diary"] {
+  forStudent(studentId: string): Omit<StudentView["diary"][number], "color">[] {
     return this.sql
       .exec<Row & { group_name: string; my_note: string | null }>(
         `SELECT d.*, g.name AS group_name, n.text AS my_note
