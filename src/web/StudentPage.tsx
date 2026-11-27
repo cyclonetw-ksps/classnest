@@ -283,7 +283,14 @@ function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: 
     return () => clearTimeout(t);
   }, [justDone, shared, onSignOut]);
 
-  if (!me.checkin.open && !justDone) return null;
+  // 伺服器說「已簽到」變回「沒簽到」（老師撤銷），或簽到已經關閉：清掉剛簽好的畫面，照伺服器的狀態顯示
+  const wasChecked = useRef(me.checkin.checkedIn);
+  useEffect(() => {
+    if ((wasChecked.current && !me.checkin.checkedIn) || !me.checkin.open) setJustDone(false);
+    wasChecked.current = me.checkin.checkedIn;
+  }, [me.checkin.checkedIn, me.checkin.open]);
+
+  if (!me.checkin.open) return null;
   if (me.checkin.checkedIn || justDone)
     return (
       <p class="checkin-done" role="status">

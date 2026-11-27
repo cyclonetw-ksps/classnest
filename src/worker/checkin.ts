@@ -62,7 +62,8 @@ export class CheckinStore {
     this.prune(now);
     const current = this.openWindow(now);
     if (current) {
-      this.sql.exec("UPDATE checkin_windows SET closes_at = ? WHERE id = ?", now + minutes * 60_000, current.id);
+      // 只延長，不縮短：再按較短的分鐘數時維持原本的結束時間
+      this.sql.exec("UPDATE checkin_windows SET closes_at = ? WHERE id = ?", Math.max(current.closes_at, now + minutes * 60_000), current.id);
     } else {
       this.sql.exec(
         "INSERT INTO checkin_windows (id, opened_by, opened_at, closes_at) VALUES (?, ?, ?, ?)",

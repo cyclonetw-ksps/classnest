@@ -123,6 +123,9 @@ describe("簽到", () => {
     expect(again.window!.id).toBe(first.window!.id);
     expect(again.window!.closesAt).toBeGreaterThan(first.window!.closesAt);
     expect(again.checkins.some((x) => x.studentId === a.s.id)).toBe(true);
+    // 開放中再按較短的分鐘數，不會把剩下的時間縮短
+    const shorter = await ok(api<CheckinView>(c, "POST", "/api/checkin/open", { minutes: 1 }));
+    expect(shorter.window!.closesAt).toBe(again.window!.closesAt);
 
     await ok(api(c, "POST", "/api/checkin/close"));
     const next = await ok(api<CheckinView>(c, "POST", "/api/checkin/open", {}));
