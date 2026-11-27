@@ -200,6 +200,10 @@ export class KioskStore {
     return row?.student_id ?? null;
   }
 
+  signOutStudent(studentId: string): void {
+    this.sql.exec("DELETE FROM student_sessions WHERE student_id = ?", studentId);
+  }
+
   async logout(token: string): Promise<void> {
     if (token) this.sql.exec("DELETE FROM student_sessions WHERE hash = ?", await sha256Hex(token));
   }

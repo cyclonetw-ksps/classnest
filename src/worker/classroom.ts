@@ -437,6 +437,8 @@ export class ClassroomDO extends DurableObject<Env> {
       if (homeClass !== undefined) this.sql.exec("UPDATE students SET home_class = ? WHERE id = ?", homeClass, id);
       if (homeroomTeacher !== undefined) this.sql.exec("UPDATE students SET homeroom_teacher = ? WHERE id = ?", homeroomTeacher, id);
       if (active !== undefined) this.sql.exec("UPDATE students SET active = ? WHERE id = ?", active ? 1 : 0, id);
+      // 停用時把學生平板上的登入一起登出；之後重新啟用也要重新點圖卡
+      if (active === false) this.kiosk.signOutStudent(id);
       if (groupIds) this.setMemberships(id, groupIds);
     });
     return ok({ id });

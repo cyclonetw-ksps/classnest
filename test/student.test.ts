@@ -305,6 +305,10 @@ describe("學生頁", () => {
     const { cookie } = await studentLogin(device, kid.id, cards);
     await ok(api(c, "PATCH", `/api/students/${kid.id}`, { active: false }));
     expect((await call("/api/student/me", { cookie: both(device, cookie) })).status).toBe(401);
+    // 重新啟用後，舊的登入也不能再用，要重新點圖卡
+    await ok(api(c, "PATCH", `/api/students/${kid.id}`, { active: true }));
+    expect((await call("/api/student/me", { cookie: both(device, cookie) })).status).toBe(401);
+    expect((await studentLogin(device, kid.id, cards)).status).toBe(200);
   });
 
   it("檢查平板名稱與模式", async () => {
