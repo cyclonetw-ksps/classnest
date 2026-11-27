@@ -6,7 +6,7 @@
 // - 分享頁只看得到已發送的作業、要帶、備註；個別加註與是誰寫的都不給。
 // - agent 金鑰只能讀某一天各組的聯絡簿（不含個別加註與學生）並草擬；已發送的不能改，也不能發送。
 import { suggestDiary } from "../shared/diary";
-import { LIMITS, type DiaryDay, type DiaryEntry, type DiaryStatus, type Lesson, type PublicDiary } from "../shared/types";
+import { LIMITS, type DiaryDay, type DiaryEntry, type DiaryStatus, type Lesson, type PublicDiary, type StudentView } from "../shared/types";
 import { mondayOf, parseDate } from "../shared/week";
 import { fail, InputError, ok, text, type Body, type Result } from "./validate";
 
@@ -215,6 +215,32 @@ export class DiaryStore {
   // 有已發送聯絡簿的組（分享頁的組別切換要列出它們）
   publishedGroups(): string[] {
     return this.sql.exec<{ group_id: string }>("SELECT DISTINCT group_id FROM diary WHERE status = 'sent'").toArray().map((r) => r.group_id);
+  }
+
+  /* ---------- 學生頁 ---------- */
+
+  // 學生所屬的使用中組別，各取最近一次已發送的一則；個別加註只給這位學生自己的
+  forStudent(studentId: string): StudentView["diary"] {
+    return this.sql
+      .exec<Row & { group_name: string; my_note: string | null }>(
+        `SELECT d.*, g.name AS group_name, n.text AS my_note
+         FROM memberships m JOIN class_groups g ON g.id = m.group_id AND g.active = 1
+         JOIN diary d ON d.group_id = m.group_id AND d.status = 'sent'
+           AND d.date = (SELECT MAX(x.date) FROM diary x WHERE x.group_id = m.group_id AND x.status = 'sent')
+         LEFT JOIN diary_notes n ON n.date = d.date AND n.group_id = d.group_id AND n.student_id = m.student_id
+         WHERE m.student_id = ? ORDER BY d.date DESC, g.created_at, g.rowid`,
+        studentId,
+      )
+      .toArray()
+      .map((r) => ({
+        date: r.date,
+        groupId: r.group_id,
+        groupName: r.group_name,
+        homework: r.homework,
+        bring: r.bring,
+        note: r.note,
+        myNote: r.my_note ?? "",
+      }));
   }
 
   /* ---------- agent ---------- */

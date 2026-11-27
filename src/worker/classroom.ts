@@ -3,6 +3,8 @@ import {
   LIMITS,
   type ClassState,
   type Group,
+  type KioskRoster,
+  type StudentView,
   type PointEvent,
   type Reason,
   type Reward,
@@ -12,6 +14,7 @@ import {
 import type { Env } from "./env";
 import { BoardStore, type AgentIdentity } from "./boards";
 import { DiaryStore, lessonsOnFrom } from "./diary";
+import { KioskStore, type DeviceAuth } from "./kiosk";
 import { ScheduleStore } from "./schedule";
 import { bool, fail, idList, InputError, int, newId, newSessionToken, ok, sha256Hex, text, type Body, type Result } from "./validate";
 
@@ -45,6 +48,7 @@ export class ClassroomDO extends DurableObject<Env> {
   private board: BoardStore;
   private schedule: ScheduleStore;
   private diary: DiaryStore;
+  private kiosk: KioskStore;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -78,6 +82,7 @@ export class ClassroomDO extends DurableObject<Env> {
     this.board = new BoardStore(this.sql, ctx.storage);
     this.schedule = new ScheduleStore(this.sql, ctx.storage);
     this.diary = new DiaryStore(this.sql, ctx.storage, lessonsOnFrom((monday) => this.schedule.week(monday)));
+    this.kiosk = new KioskStore(this.sql, ctx.storage);
   }
 
   /* ---------- 登入與工作階段 ---------- */
@@ -134,6 +139,52 @@ export class ClassroomDO extends DurableObject<Env> {
   }
 
   /* ---------- 分享頁（不需登入，只有代碼與可選通關碼） ---------- */
+
+  // 老師在這台按「設成學生平板」：登出這台的老師，回傳學生平板憑證給 Worker 放進 cookie
+  async enrollDevice(me: Me, teacherToken: string, body: Body): Promise<{ status: number; json: string; token?: string }> {
+    let token: string | undefined;
+    const r = await reply(async () => {
+      const result = await this.kiosk.enroll(me.email, body ?? {});
+      if (!result.ok) return result;
+      token = result.value.token;
+      await this.logout(teacherToken);
+      return ok({ device: result.value.device });
+    });
+    return { ...r, token };
+  }
+
+  /* ---------- 學生平板（學生平板憑證；學生登入後再加學生憑證） ---------- */
+
+  async student(
+    deviceToken: string,
+    studentToken: string,
+    method: string,
+    path: string[],
+    body: Body,
+  ): Promise<{ status: number; json: string; login?: { token: string; maxAge: number }; clear?: boolean }> {
+    const device = await this.kiosk.deviceAuth(deviceToken);
+    if (!device) return { status: 401, json: JSON.stringify({ error: "這台還不是學生平板，請老師用這台登入後在「設定」設定" }) };
+    const route = `${method} ${path.join("/")}`;
+    if (route === "GET roster") return reply(() => ok(this.roster(device)));
+    if (route === "POST login") {
+      let login: { token: string; maxAge: number } | undefined;
+      const r = await reply(async () => {
+        const result = await this.kiosk.login(device, body ?? {});
+        if (!result.ok) return result;
+        login = result.value;
+        return ok({ ok: true });
+      });
+      return { ...r, login };
+    }
+    if (route === "POST logout") {
+      await this.kiosk.logout(studentToken);
+      return { status: 200, json: JSON.stringify({ ok: true }), clear: true };
+    }
+    const studentId = await this.kiosk.studentAuth(device, studentToken);
+    if (!studentId) return { status: 401, json: JSON.stringify({ error: "請先點自己的名字登入" }) };
+    if (route === "GET me") return reply(() => ok(this.studentView(device, studentId)));
+    return { status: 404, json: JSON.stringify({ error: "找不到這個功能" }) };
+  }
 
   async publicView(code: string, body: Body): Promise<{ status: number; json: string }> {
     return this.board.publicView(code, body ?? {}, this.diary);
@@ -246,6 +297,14 @@ export class ClassroomDO extends DurableObject<Env> {
         return this.schedule.copyLastWeek(id, me.email);
       case "PUT lessons":
         return this.schedule.setLesson(me.email, body);
+      case "PATCH devices/:id":
+        return this.kiosk.updateDevice(id, body);
+      case "DELETE devices/:id":
+        return this.kiosk.deleteDevice(id);
+      case "POST students/:id/cards":
+        return this.kiosk.generateCards(id);
+      case "GET login-cards":
+        return ok(this.kiosk.loginCards());
       case "GET diary/:id":
         return this.diary.day(id);
       case "PUT diary":
@@ -572,6 +631,7 @@ export class ClassroomDO extends DurableObject<Env> {
     for (const g of this.sql.exec<{ reward_id: string; student_id: string; granted_at: number }>("SELECT * FROM grants").toArray()) {
       grants.set(`${g.reward_id}:${g.student_id}`, g.granted_at);
     }
+    const withCards = this.kiosk.withCards();
     return this.sql
       .exec<{ id: string; display_name: string; home_class: string; homeroom_teacher: string; active: number }>(
         "SELECT id, display_name, home_class, homeroom_teacher, active FROM students ORDER BY created_at, rowid",
@@ -587,6 +647,7 @@ export class ClassroomDO extends DurableObject<Env> {
           groupIds: groups.get(r.id) ?? [],
           active: !!r.active,
           total,
+          hasCards: withCards.has(r.id),
           rewards: rewards.map((w) => ({
             rewardId: w.id,
             unlocked: total >= w.threshold,
@@ -594,6 +655,67 @@ export class ClassroomDO extends DurableObject<Env> {
           })),
         };
       });
+  }
+
+  /* ---------- 學生平板與學生頁 ---------- */
+
+  // 每個組的色紙位置：照全部組別（含停用）的建立順序，和老師端一致
+  private groupColors(): Map<string, number> {
+    const ids = this.sql.exec<{ id: string }>("SELECT id FROM class_groups ORDER BY created_at, rowid").toArray();
+    return new Map(ids.map((g, i) => [g.id, i]));
+  }
+
+  // 選人畫面：只有使用中的組與學生的顯示名，不給分數或其他欄位
+  private roster(device: DeviceAuth): KioskRoster {
+    const colors = this.groupColors();
+    const groups = this.sql
+      .exec<{ id: string; name: string }>("SELECT id, name FROM class_groups WHERE active = 1 ORDER BY created_at, rowid")
+      .toArray()
+      .map((g) => ({ id: g.id, name: g.name, color: colors.get(g.id) ?? 0 }));
+    const active = new Set(groups.map((g) => g.id));
+    const memberships = new Map<string, string[]>();
+    for (const m of this.sql.exec<{ student_id: string; group_id: string }>("SELECT student_id, group_id FROM memberships").toArray()) {
+      if (active.has(m.group_id)) memberships.set(m.student_id, [...(memberships.get(m.student_id) ?? []), m.group_id]);
+    }
+    const withCards = this.kiosk.withCards();
+    const students = this.sql
+      .exec<{ id: string; display_name: string }>("SELECT id, display_name FROM students WHERE active = 1 ORDER BY created_at, rowid")
+      .toArray()
+      .map((s) => ({
+        id: s.id,
+        displayName: s.display_name,
+        groupIds: (memberships.get(s.id) ?? []).sort((a, b) => (colors.get(a) ?? 0) - (colors.get(b) ?? 0)),
+        ready: withCards.has(s.id),
+      }));
+    return { title: this.publicTitle(), mode: device.mode, groups, students };
+  }
+
+  // 學生自己：顯示名、累積分、獎勵進度、聯絡簿。不含其他學生的任何資料
+  private studentView(device: DeviceAuth, studentId: string): StudentView {
+    const s = this.sql.exec<{ display_name: string }>("SELECT display_name FROM students WHERE id = ?", studentId).one();
+    const colors = this.groupColors();
+    const first = this.sql
+      .exec<{ group_id: string }>(
+        `SELECT m.group_id FROM memberships m JOIN class_groups g ON g.id = m.group_id
+         WHERE m.student_id = ? AND g.active = 1 ORDER BY g.created_at, g.rowid LIMIT 1`,
+        studentId,
+      )
+      .toArray()[0];
+    const total = this.total(studentId);
+    const granted = new Set(
+      this.sql.exec<{ reward_id: string }>("SELECT reward_id FROM grants WHERE student_id = ?", studentId).toArray().map((g) => g.reward_id),
+    );
+    return {
+      mode: device.mode,
+      title: this.publicTitle(),
+      displayName: s.display_name,
+      color: first ? (colors.get(first.group_id) ?? -1) : -1,
+      total,
+      rewards: this.rewards()
+        .filter((w) => w.active)
+        .map((w) => ({ id: w.id, title: w.title, threshold: w.threshold, unlocked: total >= w.threshold, granted: granted.has(w.id) })),
+      diary: this.diary.forStudent(studentId),
+    };
   }
 
   private rewards(): Reward[] {
@@ -632,6 +754,7 @@ export class ClassroomDO extends DurableObject<Env> {
       boards: this.board.boards(),
       share: this.board.share(),
       agentKeys: this.board.agentKeys(),
+      devices: this.kiosk.devices(),
       periods: this.schedule.periods(),
       slots: this.schedule.slots(),
     };
