@@ -55,6 +55,13 @@ export function StudentPage() {
     load();
   }, [load]);
 
+  // 學生頁開著時每 15 秒更新一次：老師開放簽到後按鈕就會出現
+  useEffect(() => {
+    if (phase !== "me") return;
+    const id = setInterval(() => document.visibilityState === "visible" && load(), 15_000);
+    return () => clearInterval(id);
+  }, [phase, load]);
+
   useEffect(() => {
     const title = me?.title ?? roster?.title;
     document.title = title ? `${title}｜學生` : "學生";
@@ -95,7 +102,7 @@ export function StudentPage() {
         </a>
       </main>
     );
-  if (phase === "me" && me) return <MePage me={me} onSignOut={signOut} />;
+  if (phase === "me" && me) return <MePage me={me} onSignOut={signOut} onReload={load} />;
   if (roster) return <Picker roster={roster} onLogin={load} />;
   return null;
 }
@@ -261,7 +268,62 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
 
 /* ---------- 學生自己的頁面 ---------- */
 
-function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
+// 簽到：老師開放中才出現；簽好後共用平板幾秒後自動換下一位
+const NEXT_S = 5;
+
+function CheckinCard({ me, onSignOut, onReload }: { me: StudentView; onSignOut: () => void; onReload: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [justDone, setJustDone] = useState(false);
+  const shared = me.mode === "shared";
+
+  useEffect(() => {
+    if (!justDone || !shared) return;
+    const t = setTimeout(onSignOut, NEXT_S * 1000);
+    return () => clearTimeout(t);
+  }, [justDone, shared, onSignOut]);
+
+  if (!me.checkin.open && !justDone) return null;
+  if (me.checkin.checkedIn || justDone)
+    return (
+      <p class="checkin-done" role="status">
+        <Check />
+        <span>
+          <span class="clause">簽到好了！</span>
+          {justDone && shared && <span class="clause">{NEXT_S} 秒後換下一位。</span>}
+        </span>
+      </p>
+    );
+  return (
+    <div class="checkin-cta">
+      <button
+        class="btn primary checkin-btn"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            await request("POST", "student/checkin");
+            setJustDone(true);
+            onReload();
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : "連不上伺服器，再按一次");
+            onReload();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        我來了，簽到
+      </button>
+      <p class="kiosk-msg error" role="status">
+        {error}
+      </p>
+    </div>
+  );
+}
+
+function MePage({ me, onSignOut, onReload }: { me: StudentView; onSignOut: () => void; onReload: () => void }) {
   const shared = me.mode === "shared";
   // 共用平板：一陣子沒動就自動換人
   const timer = useRef<number>();
@@ -294,6 +356,7 @@ function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
         </button>
       </header>
       <main class="sheet me">
+        <CheckinCard me={me} onSignOut={onSignOut} onReload={onReload} />
         <section class="me-card" style={{ ...paperStyle(me.color), "--pin": me.color < 0 ? "var(--paper-red)" : paperAt(me.color).hue }} aria-labelledby="me-name">
           <span class="pin drop me-pin" aria-hidden="true" />
           <div class="me-who">
