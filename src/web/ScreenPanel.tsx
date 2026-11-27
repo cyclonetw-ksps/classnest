@@ -108,7 +108,8 @@ export function ScreenPanel({ hidden, state }: { hidden: boolean; state: ClassSt
     const gap = lastTick.current ? now - lastTick.current : 0;
     lastBell.current = bellKeyNow;
     lastTick.current = bellKeyNow ? now : 0;
-    if (!bell || !bellKeyNow || !bellChimes(prev, bellKeyNow, gap)) return;
+    const cancelled = todayLessons.filter((l) => l.cancelled).map((l) => l.periodId);
+    if (!bell || !bellKeyNow || !bellChimes(prev, bellKeyNow, gap, cancelled)) return;
     setAnnounce(bell.kind === "class" ? `上課：${bell.period.label}` : "下課");
     if (!mutedRef.current) playChime();
   }, [bellKeyNow, now]);

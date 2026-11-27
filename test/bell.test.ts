@@ -93,6 +93,13 @@ describe("提示音", () => {
     expect(bellChimes(key(9, 29), key(9, 30), 4_000)).toBe(true);
     expect(bellChimes(key(9, 0), key(9, 30), 30 * MIN)).toBe(false);
   });
+  it("停課的節上下課不響；相接的兩節只要有一節照常上課就響", () => {
+    expect(bellChimes(key(9, 29), key(9, 30), 0, ["p2"])).toBe(false); // 第二節停課：上課不響
+    expect(bellChimes(key(10, 49), key(10, 50), 0, ["p3"])).toBe(false); // 第三節停課：下課不響
+    expect(bellChimes(key(10, 9), key(10, 10), 0, ["p2"])).toBe(true); // 第二節停課、第三節照常：換節要響
+    expect(bellChimes(key(10, 9), key(10, 10), 0, ["p2", "p3"])).toBe(false);
+    expect(bellChimes(key(9, 19), key(9, 20), 0, ["p2"])).toBe(true); // 別節停課不影響
+  });
 });
 
 describe("課表上標「現在這一節」", () => {
