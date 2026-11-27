@@ -55,3 +55,9 @@ export function bellChimes(prev: string | null, next: string, gapMs = 0): boolea
   if (prev === null || prev === next || gapMs > STALE_MS) return false;
   return prev.startsWith("class:") || next.startsWith("class:");
 }
+
+// 課表上要標「現在這一節」的節次 id；不在上課中（下課、放學、週末）就是 null
+export function classNow(now: number, weekday: number, periods: Period[]): string | null {
+  const b = bellAt(now, weekday, periods, []);
+  return b.kind === "class" ? b.period.id : null;
+}

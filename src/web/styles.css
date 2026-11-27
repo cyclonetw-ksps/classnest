@@ -680,6 +680,16 @@ input.has-error { border-color: var(--danger); background: var(--danger-soft); }
   font-size: var(--fs-tag); font-weight: 700; white-space: nowrap;
 }
 .sheet h3.tt-day-title { margin: 4px 0 0; }
+/* 現在這一節：實心黃底「上課中」小標＋整格黃色實線框（今天是黃虛線，形狀不同） */
+.tt-now {
+  display: inline-block; margin-top: 4px; padding: 0 6px; border-radius: var(--r-tag);
+  background: var(--paper-sun); color: var(--on-sun); font-size: var(--fs-tag); font-weight: 700; white-space: nowrap;
+}
+.tt-list-head .tt-now { margin-top: 0; }
+.tt-table td.is-now .lesson, .tt-list li.is-now .lesson { outline: 3px solid var(--paper-sun); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .tt-table td.is-fresh .lesson, .tt-list li.is-fresh .lesson { animation: note-pin 0.55s var(--ease-out) both; }
+}
 .tt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .tt-list li { display: grid; gap: 6px; }
 .tt-list-head { display: flex; gap: 10px; align-items: baseline; }

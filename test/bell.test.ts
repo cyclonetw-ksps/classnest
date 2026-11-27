@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BEFORE_WINDOW_MS, bellAt, bellChimes, bellKey, STALE_MS, type BellLesson } from "../src/shared/bell";
+import { BEFORE_WINDOW_MS, bellAt, bellChimes, bellKey, classNow, STALE_MS, type BellLesson } from "../src/shared/bell";
 import type { Period } from "../src/shared/types";
 
 // 2026-11-25 是週三；用當地時間建時刻，任何時區跑都一樣
@@ -92,5 +92,20 @@ describe("提示音", () => {
     expect(bellChimes(key(9, 29), key(9, 30), 250)).toBe(true);
     expect(bellChimes(key(9, 29), key(9, 30), 4_000)).toBe(true);
     expect(bellChimes(key(9, 0), key(9, 30), 30 * MIN)).toBe(false);
+  });
+});
+
+describe("課表上標「現在這一節」", () => {
+  it("上課中回傳這一節的 id，含剛好上課那一刻", () => {
+    expect(classNow(at(8, 50), 3, periods)).toBe("p1");
+    expect(classNow(at(8, 40), 3, periods)).toBe("p1");
+    expect(classNow(at(10, 10), 3, periods)).toBe("p3"); // 相接的節次，下課那一刻已是下一節
+  });
+  it("下課、第一節前、放學後、週末與沒有節次都不標", () => {
+    expect(classNow(at(9, 25), 3, periods)).toBeNull();
+    expect(classNow(at(8, 0), 3, periods)).toBeNull();
+    expect(classNow(at(10, 50), 3, periods)).toBeNull();
+    expect(classNow(at(8, 50), 6, periods)).toBeNull();
+    expect(classNow(at(8, 50), 3, [])).toBeNull();
   });
 });

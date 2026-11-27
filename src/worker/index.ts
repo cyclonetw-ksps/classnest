@@ -79,7 +79,7 @@ async function handleApi(request: Request, env: Env, path: string[]): Promise<Re
     }
     if (!identity) return error(401, "Google 登入驗證失敗，請重新登入");
     const token = await room.login(identity.email, identity.name, env.FIRST_TEACHER_EMAIL);
-    if (!token) return error(403, "這個 Google 帳號不在老師名單內，請請已登入的老師邀請你");
+    if (!token) return error(403, "這個 Google 帳號不在老師名單內，請已登入的老師邀請你");
     return json({ email: identity.email }, 200, { "set-cookie": sessionCookie(token, COOKIE_MAX_AGE_S) });
   }
   if (route === "POST auth/logout") {
