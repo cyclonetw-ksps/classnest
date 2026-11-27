@@ -43,7 +43,12 @@ export function PrintCards() {
     <div class="print-page">
       <header class="print-head">
         <h1>{data.state.title}｜圖卡密碼</h1>
-        <p class="hint">在學生平板上點自己的名字，再依照 1、2、3 的順序點圖卡。剪下來發給每位學生，收好不要給別人看。</p>
+        <p class="hint">
+          <span class="clause">在學生平板上點自己的名字，</span>
+          <span class="clause">再依照 1、2、3 的順序點圖卡。</span>
+          <span class="clause">剪下來發給每位學生，</span>
+          <span class="clause">收好不要給別人看。</span>
+        </p>
         <button class="btn primary" onClick={() => print()}>
           列印
         </button>

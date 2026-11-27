@@ -933,6 +933,16 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 .pic[aria-pressed="true"] .card-pic { opacity: 0.3; }
 .pic:disabled:not([aria-pressed="true"]) { cursor: default; box-shadow: none; }
 .kiosk-foot { display: flex; }
+/* 圖卡那一步：位置、訊息、圖卡、重來對齊同一條置中的軸 */
+.card-pad { display: grid; gap: 18px; justify-self: center; width: min(100%, 36rem); }
+.card-pad .pic-grid { max-width: none; }
+/* 中文說明以子句為單位斷行，不把詞拆開 */
+.clause { display: inline-block; }
+/* 選人的白卡也像手釘上去的 */
+.kids li:nth-child(3n + 1) .kid:not(.not-ready) { rotate: -0.5deg; }
+.kids li:nth-child(3n + 2) .kid:not(.not-ready) { rotate: 0.35deg; }
+/* 學生頁的學生卡右上角一枚組別色圖釘，打開時落下釘住（減少動態效果時直接出現） */
+.me-pin { position: absolute; top: 28px; right: 22px; width: 20px; height: 20px; }
 
 /* 學生自己的頁面 */
 .kiosk .sheet.me { gap: 28px; }
@@ -991,7 +1001,12 @@ textarea.grow { field-sizing: content; width: 100%; min-block-size: 3lh; max-blo
 .slip-name { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0; }
 .slip-name b { font-size: 1.25rem; }
 @media print {
-  .print-page { padding: 0; background: #ffffff; min-height: 0; }
+  /* 列印一律用淺色紙面的顏色，而且保留背景色（圖卡順序的 1、2、3 與組別色帶靠背景色） */
+  :root { --ink: #1d2a30; --muted: #56666c; --line-strong: #c9c1ae; --sheet: #ffffff; --card: #ffffff; --felt: #1f4e5f; }
+  .print-page, .print-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #ffffff !important; }
+  .print-page { padding: 0; background: #ffffff; color: #1d2a30; min-height: 0; }
+  .print-page .seq-no { box-shadow: none; }
   .print-head .btn { display: none; }
   .print-slip { border-color: #8a7f6e; }
 }

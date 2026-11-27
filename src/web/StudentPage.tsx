@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { CARD_COUNT, PASSWORD_LENGTH } from "../shared/cards";
-import type { KioskRoster, StudentView } from "../shared/types";
+import { LIMITS, type KioskRoster, type StudentView } from "../shared/types";
 import { localDate, weekdayOf, WEEKDAY_NAMES } from "../shared/week";
 import { ApiError, request } from "./api";
 import { CardPicture, cardName } from "./cards";
@@ -81,8 +81,15 @@ export function StudentPage() {
   if (phase === "device")
     return (
       <main class="login">
-        <h1>這台還不是學生平板</h1>
-        <p class="muted">請老師用這台登入，到「設定」裡的「學生平板」，按「把這台設成學生平板」。</p>
+        <h1>
+          <span class="clause">這台</span>
+          <span class="clause">還不是學生平板</span>
+        </h1>
+        <p class="muted">
+          <span class="clause">請老師用這台登入，</span>
+          <span class="clause">到「設定」裡的「學生平板」，</span>
+          <span class="clause">按「把這台設成學生平板」。</span>
+        </p>
         <a class="btn primary" href="/#settings">
           老師登入
         </a>
@@ -133,7 +140,12 @@ function Picker({ roster, onLogin }: { roster: KioskRoster; onLogin: () => void 
                     <button class={`kid${s.ready ? "" : " not-ready"}`} disabled={!s.ready} onClick={() => setKid(s)}>
                       <Avatar name={s.displayName} color={colorOf(s)} />
                       <span class="kid-name">{s.displayName}</span>
-                      {!s.ready && <span class="kid-note">還沒有圖卡，請找老師</span>}
+                      {!s.ready && (
+                        <span class="kid-note">
+                          <span class="clause">還沒有圖卡，</span>
+                          <span class="clause">請找老師</span>
+                        </span>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -169,6 +181,13 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
   const [busy, setBusy] = useState(false);
   const [shake, setShake] = useState(0);
 
+  // 暫停時間到就自動恢復，不用重新整理
+  useEffect(() => {
+    if (!msg?.locked) return;
+    const t = setTimeout(() => setMsg(null), LIMITS.cardLockMs);
+    return () => clearTimeout(t);
+  }, [msg]);
+
   async function tap(card: number) {
     if (busy || picked.includes(card) || picked.length >= PASSWORD_LENGTH) return;
     const next = [...picked, card];
@@ -199,6 +218,7 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
           不是我
         </button>
       </div>
+      <div class="card-pad">
       <p class="kiosk-ask">依序點你的 {PASSWORD_LENGTH} 張圖卡</p>
       <ol class="slots" aria-label={`已經點了 ${picked.length} 張`} key={shake} data-shake={shake > 0 ? "" : undefined}>
         {Array.from({ length: PASSWORD_LENGTH }, (_, i) => (
@@ -210,6 +230,13 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
       <p class={`kiosk-msg${msg ? " error" : ""}`} role="status">
         {msg?.text}
       </p>
+      {msg?.locked && (
+        <div class="kiosk-foot">
+          <button class="btn primary" onClick={onBack}>
+            回到選名字
+          </button>
+        </div>
+      )}
       <ul class="pic-grid">
         {Array.from({ length: CARD_COUNT }, (_, i) => (
           <li key={i}>
@@ -227,6 +254,7 @@ function CardLogin({ kid, color, onBack, onLogin }: { kid: Kid; color: number; o
           </button>
         </div>
       )}
+      </div>
     </section>
   );
 }
@@ -266,7 +294,8 @@ function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
         </button>
       </header>
       <main class="sheet me">
-        <section class="me-card" style={paperStyle(me.color)} aria-labelledby="me-name">
+        <section class="me-card" style={{ ...paperStyle(me.color), "--pin": me.color < 0 ? "var(--paper-red)" : paperAt(me.color).hue }} aria-labelledby="me-name">
+          <span class="pin drop me-pin" aria-hidden="true" />
           <div class="me-who">
             <Avatar name={me.displayName} color={me.color} size="big" />
             <h2 id="me-name">嗨，{me.displayName}</h2>
@@ -336,7 +365,12 @@ function MePage({ me, onSignOut }: { me: StudentView; onSignOut: () => void }) {
             </ol>
           </section>
         )}
-        {shared && <p class="hint kiosk-hint">用完請按右上角「換人」；{IDLE_S} 秒沒動也會自動換人。</p>}
+        {shared && (
+          <p class="hint kiosk-hint">
+            <span class="clause">用完請按右上角「換人」；</span>
+            <span class="clause">{IDLE_S} 秒沒動也會自動換人。</span>
+          </p>
+        )}
       </main>
     </div>
   );
