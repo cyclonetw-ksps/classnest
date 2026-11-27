@@ -18,7 +18,8 @@ describe("學生名單", () => {
     expect(found.displayName).toBe("王〇明");
     expect(found.homeClass).toBe("五年一班");
     expect(found.homeroomTeacher).toBe("王老師");
-    expect(Object.keys(found).sort()).toEqual(["active", "displayName", "groupIds", "homeClass", "homeroomTeacher", "id", "rewards", "total"]);
+    // hasCards 只是「老師產生過圖卡密碼沒有」，不是個資；密碼本身不在名單裡
+    expect(Object.keys(found).sort()).toEqual(["active", "displayName", "groupIds", "hasCards", "homeClass", "homeroomTeacher", "id", "rewards", "total"]);
   });
 
   it("可以改名、停用、再啟用", async () => {

@@ -47,6 +47,48 @@ export interface Student {
   active: boolean;
   total: number;
   rewards: StudentReward[];
+  // 老師是否已經產生圖卡密碼（密碼本身只在「印圖卡密碼」時才給）
+  hasCards: boolean;
+}
+
+// 學生平板：老師在那台平板上設定，只有學生平板能列出名單、讓學生用圖卡登入。
+// shared（共用）每位學生登入 10 分鐘就失效；personal（個人）一直記住，直到老師登出那台平板
+export type DeviceMode = "shared" | "personal";
+export interface Device {
+  id: string;
+  name: string;
+  mode: DeviceMode;
+  createdAt: number;
+  lastSeenAt: number | null;
+  // 個人平板目前記住的學生
+  studentName: string | null;
+}
+
+// 印圖卡密碼用：card 是 CARD_NAMES 的位置
+export interface LoginCards {
+  studentId: string;
+  displayName: string;
+  groupIds: string[];
+  cards: number[];
+}
+
+// 學生平板上的選人畫面：只有組別與顯示名，沒有分數或其他欄位。color 是組別在全部組別裡的位置（決定色紙）
+export interface KioskRoster {
+  title: string;
+  mode: DeviceMode;
+  groups: { id: string; name: string; color: number }[];
+  students: { id: string; displayName: string; groupIds: string[]; ready: boolean }[];
+}
+
+// 學生登入後看到的自己：分數、獎勵進度、所屬組最近一次已發送的聯絡簿與給自己的加註
+export interface StudentView {
+  mode: DeviceMode;
+  title: string;
+  displayName: string;
+  color: number;
+  total: number;
+  rewards: { id: string; title: string; threshold: number; unlocked: boolean; granted: boolean }[];
+  diary: { date: string; groupId: string; groupName: string; color: number; homework: string; bring: string; note: string; myNote: string }[];
 }
 
 export interface PointEvent {
@@ -183,6 +225,7 @@ export interface ClassState {
   agentKeys: AgentKey[];
   periods: Period[];
   slots: Slot[];
+  devices: Device[];
 }
 
 // 分享頁看到的內容：只有分享的面板與組別名稱，沒有任何學生資料，也不顯示是誰貼的
@@ -242,6 +285,11 @@ export const LIMITS = {
   studentNote: 200,
   // 分享頁顯示最近幾個有發送聯絡簿的日期
   publicDiaryDays: 5,
+  // 學生平板與圖卡密碼
+  devices: 30,
+  cardAttempts: 5,
+  cardLockMs: 5 * 60 * 1000,
+  sharedSessionMs: 10 * 60 * 1000,
   // 通關碼連續答錯幾次後暫停一段時間
   pinAttempts: 10,
   pinLockMs: 10 * 60 * 1000,

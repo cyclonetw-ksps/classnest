@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { LIMITS, type ClassState } from "../shared/types";
 import { request } from "./api";
 import { AgentKeys } from "./AgentKeys";
+import { Devices } from "./Devices";
 import type { Act } from "./App";
 
 export function SettingsPanel({ state, act }: { state: ClassState; act: Act }) {
@@ -73,6 +74,8 @@ export function SettingsPanel({ state, act }: { state: ClassState; act: Act }) {
           </li>
         ))}
       </ul>
+
+      <Devices state={state} act={act} />
 
       <AgentKeys state={state} act={act} />
     </section>

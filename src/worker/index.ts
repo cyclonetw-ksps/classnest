@@ -1,10 +1,14 @@
 import type { PublicConfig } from "../shared/types";
 import type { Env } from "./env";
 import { JwksUnavailableError, verifyGoogleIdToken } from "./google";
+import { LONG_COOKIE_S } from "./kiosk";
 import { handleMcp } from "./mcp";
 export { ClassroomDO } from "./classroom";
 
 const COOKIE = "cn_session";
+// 學生平板與學生登入用另外兩個 cookie；老師 API 只認 cn_session
+const DEVICE_COOKIE = "cn_device";
+const STUDENT_COOKIE = "cn_student";
 const COOKIE_MAX_AGE_S = 30 * 24 * 60 * 60;
 const MAX_BODY = 64 * 1024;
 
@@ -16,18 +20,28 @@ function classroom(env: Env) {
   return env.CLASSROOM.get(env.CLASSROOM.idFromName("classroom"));
 }
 
-function sessionToken(request: Request): string {
+function cookieValue(request: Request, name: string): string {
   const cookie = request.headers.get("cookie") ?? "";
   for (const part of cookie.split(";")) {
     const [k, ...v] = part.trim().split("=");
-    if (k === COOKIE) return v.join("=");
+    if (k === name) return v.join("=");
   }
   return "";
 }
 
-function sessionCookie(token: string, maxAge: number): string {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+const sessionToken = (request: Request) => cookieValue(request, COOKIE);
+
+function setCookie(name: string, token: string, maxAge: number): string {
+  return `${name}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
+
+const sessionCookie = (token: string, maxAge: number) => setCookie(COOKIE, token, maxAge);
+
+const jsonResponse = (result: { status: number; json: string }, headers: [string, string][] = []) => {
+  const h = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  for (const [k, v] of headers) h.append(k, v);
+  return new Response(result.json, { status: result.status, headers: h });
+};
 
 // 寫入請求若帶了 Origin，必須是本站；擋掉其他網站借用老師的 cookie 送出的請求
 function crossSite(request: Request): boolean {
@@ -97,6 +111,18 @@ async function handleApi(request: Request, env: Env, path: string[]): Promise<Re
     });
   }
 
+  // 學生平板：只認學生平板與學生的 cookie，不認老師的登入
+  if (path[0] === "student") {
+    const deviceToken = cookieValue(request, DEVICE_COOKIE);
+    const result = await room.student(deviceToken, cookieValue(request, STUDENT_COOKIE), request.method, path.slice(1), body);
+    const headers: [string, string][] = [];
+    if (result.login) headers.push(["set-cookie", setCookie(STUDENT_COOKIE, result.login.token, result.login.maxAge)]);
+    if (result.clear) headers.push(["set-cookie", setCookie(STUDENT_COOKIE, "", 0)]);
+    // 學生平板每次讀名單就延長記住的時間
+    if (route === "GET student/roster" && result.status === 200) headers.push(["set-cookie", setCookie(DEVICE_COOKIE, deviceToken, LONG_COOKIE_S)]);
+    return jsonResponse(result, headers);
+  }
+
   // 登入相關只有上面兩個入口，沒有其他（例如開發用的免驗證登入）
   if (path[0] === "auth") return error(404, "找不到這個功能");
 
@@ -104,11 +130,18 @@ async function handleApi(request: Request, env: Env, path: string[]): Promise<Re
   if (!me) return error(401, "請先登入");
   if (route === "GET me") return json(me);
 
-  const result = await room.api(me, request.method, path, body);
-  return new Response(result.json, {
-    status: result.status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
-  });
+  // 把這台設成學生平板：發學生平板憑證，並登出這台的老師
+  if (route === "POST devices") {
+    const result = await room.enrollDevice(me, sessionToken(request), body);
+    if (!result.token) return jsonResponse(result);
+    return jsonResponse(result, [
+      ["set-cookie", setCookie(DEVICE_COOKIE, result.token, LONG_COOKIE_S)],
+      ["set-cookie", setCookie(STUDENT_COOKIE, "", 0)],
+      ["set-cookie", sessionCookie("", 0)],
+    ]);
+  }
+
+  return jsonResponse(await room.api(me, request.method, path, body));
 }
 
 export default {
