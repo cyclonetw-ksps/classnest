@@ -102,6 +102,32 @@ describe("聯絡簿", () => {
     expect((await save(c, { date, groupId: g1.id, homework: "習作", status: "draft", studentNotes: [{ studentId: "nobody", text: "x" }] })).status).toBe(400);
   });
 
+  it("學生離開這一組後：舊的加註不再出現，也不擋存檔；清空送回來可以存，再寫新的不行", async () => {
+    const { c, g1, g2 } = await setup();
+    const date = "2026-12-15";
+    const leaver = await ok(api<Student>(c, "POST", "/api/students", { displayName: "轉組的", groupIds: [g1.id] }));
+    await ok(save(c, { date, groupId: g1.id, homework: "習作", status: "sent", studentNotes: [{ studentId: leaver.id, text: "舊加註" }] }));
+    await ok(api(c, "PATCH", `/api/students/${leaver.id}`, { groupIds: [g2.id] }));
+    expect(entryOf(await day(c, date), g1.id).studentNotes).toEqual([]);
+    // 舊畫面還留著這位學生、送回空白：可以存（收回成草稿）
+    const back = await ok(save(c, { date, groupId: g1.id, homework: "習作", status: "draft", studentNotes: [{ studentId: leaver.id, text: "" }] }));
+    expect(back).toMatchObject({ status: "draft", studentNotes: [] });
+    expect((await save(c, { date, groupId: g1.id, homework: "習作", status: "draft", studentNotes: [{ studentId: leaver.id, text: "新加註" }] })).status).toBe(400);
+  });
+
+  it("只剩離組學生的舊加註時，清空全組內容就回到還沒寫", async () => {
+    const { c, g1, g2 } = await setup();
+    const date = "2026-12-16";
+    const leaver = await ok(api<Student>(c, "POST", "/api/students", { displayName: "也轉組的", groupIds: [g1.id] }));
+    await ok(save(c, { date, groupId: g1.id, homework: "習作", status: "draft", studentNotes: [{ studentId: leaver.id, text: "舊加註" }] }));
+    await ok(api(c, "PATCH", `/api/students/${leaver.id}`, { groupIds: [g2.id] }));
+    const cleared = await ok(save(c, { date, groupId: g1.id, homework: "", status: "draft" }));
+    expect(cleared.status).toBe("empty");
+    // 學生回到這一組，也不會冒出舊加註
+    await ok(api(c, "PATCH", `/api/students/${leaver.id}`, { groupIds: [g1.id] }));
+    expect(entryOf(await day(c, date), g1.id).studentNotes).toEqual([]);
+  });
+
   it("只有個別加註、沒有全組內容時可以存草稿，不能發送", async () => {
     const { c, g1, s1 } = await setup();
     const date = "2026-12-08";

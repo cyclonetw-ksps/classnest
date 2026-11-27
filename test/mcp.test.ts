@@ -232,6 +232,15 @@ describe("MCP 聯絡簿", () => {
     expect(e.studentNotes).toEqual([{ studentId: s.id, text: "加油" }]);
   });
 
+  it("agent 把欄位都清成空字串、又沒有個別加註時，那一則回到還沒寫", async () => {
+    const { c, g, k } = await setupDiary();
+    await tool(k.key, "draft_contact_book", { date: "2026-12-17", groupId: g.id, homework: "先寫", bring: "直笛" });
+    expect(entry(await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-17")), g.id).status).toBe("draft");
+    const r = await tool(k.key, "draft_contact_book", { date: "2026-12-17", groupId: g.id, homework: "", bring: "" });
+    expect(r.isError).toBe(false);
+    expect(entry(await ok(api<DiaryDay>(c, "GET", "/api/diary/2026-12-17")), g.id)).toMatchObject({ status: "empty", homework: "", bring: "", updatedAt: null });
+  });
+
   it("agent 不能改已發送的聯絡簿", async () => {
     const { c, g, k } = await setupDiary();
     await ok(api(c, "PUT", "/api/diary", { date: "2026-12-11", groupId: g.id, homework: "已發送", status: "sent" }));

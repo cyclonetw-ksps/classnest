@@ -77,10 +77,13 @@ export class DiaryStore {
     return this.sql.exec<Row>("SELECT * FROM diary WHERE date = ? AND group_id = ?", d, groupId).toArray()[0];
   }
 
+  // 只算現在還在這一組的學生；離組學生的舊加註不顯示、不複製，也不算「有加註」
   private notes(d: string, groupId: string): { studentId: string; text: string }[] {
     return this.sql
       .exec<{ student_id: string; text: string }>(
-        `SELECT n.student_id, n.text FROM diary_notes n JOIN students s ON s.id = n.student_id
+        `SELECT n.student_id, n.text FROM diary_notes n
+         JOIN students s ON s.id = n.student_id
+         JOIN memberships m ON m.student_id = n.student_id AND m.group_id = n.group_id
          WHERE n.date = ? AND n.group_id = ? ORDER BY s.created_at, s.rowid`,
         d,
         groupId,
@@ -106,10 +109,12 @@ export class DiaryStore {
     };
   }
 
-  // 寫入（或全部清空時刪掉）一則；個別加註另外處理
+  // 寫入（或全部清空時刪掉）一則；個別加註另外處理。
+  // 刪掉時一併清掉這一則剩下的加註（只會是離組學生的舊加註，免得學生回到這一組時又冒出來）
   private write(d: string, groupId: string, f: Fields, status: "draft" | "sent", actor: string, hasNotes: boolean): void {
     if (isEmpty(f) && !hasNotes) {
       this.sql.exec("DELETE FROM diary WHERE date = ? AND group_id = ?", d, groupId);
+      this.sql.exec("DELETE FROM diary_notes WHERE date = ? AND group_id = ?", d, groupId);
       return;
     }
     const now = Date.now();
@@ -147,7 +152,7 @@ export class DiaryStore {
     const f = fields(body);
     if (status === "sent" && isEmpty(f)) return fail(400, "聯絡簿是空的，寫了作業、要帶的東西或備註才能發送");
 
-    // 個別加註：學生要存在且在這一組；空白代表刪掉；沒給 studentNotes 就不動
+    // 個別加註：寫內容時學生要在這一組；空白代表刪掉（離組學生的舊加註也能這樣清掉）；沒給 studentNotes 就不動
     let notes: { studentId: string; text: string }[] | undefined;
     if (body.studentNotes !== undefined) {
       if (!Array.isArray(body.studentNotes) || body.studentNotes.length > LIMITS.students) throw new InputError("個別加註格式不正確");
@@ -155,9 +160,10 @@ export class DiaryStore {
         if (!n || typeof n !== "object") throw new InputError("個別加註格式不正確");
         const item = n as Body;
         const studentId = typeof item.studentId === "string" ? item.studentId : "";
+        const note = text(item, "text", LIMITS.studentNote, { label: "個別加註" }) ?? "";
         const member = this.sql.exec("SELECT 1 FROM memberships WHERE student_id = ? AND group_id = ?", studentId, groupId).toArray().length;
-        if (!member) throw new InputError("只能替這一組的學生加註");
-        return { studentId, text: text(item, "text", LIMITS.studentNote, { label: "個別加註" }) ?? "" };
+        if (note && !member) throw new InputError("只能替這一組的學生加註");
+        return { studentId, text: note };
       });
     }
 
